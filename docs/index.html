@@ -432,6 +432,168 @@
       font-size: 0.9rem;
     }
 
+    /* 三层分离架构 */
+    .architecture {
+      padding: 6rem 2rem;
+      background: linear-gradient(180deg, var(--bg-dark) 0%, var(--bg-card) 100%);
+    }
+
+    .arch-layers {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+
+    .arch-layer {
+      background: var(--bg-card);
+      border-radius: 16px;
+      padding: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s ease;
+    }
+
+    .arch-layer:hover {
+      border-color: rgba(233, 69, 96, 0.3);
+      transform: translateX(5px);
+    }
+
+    .arch-header {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+    }
+
+    .arch-badge {
+      padding: 0.35rem 0.75rem;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      font-family: 'Courier New', monospace;
+    }
+
+    .arch-badge.css {
+      background: rgba(59, 130, 246, 0.2);
+      color: #60a5fa;
+    }
+
+    .arch-badge.js {
+      background: rgba(245, 158, 11, 0.2);
+      color: #fbbf24;
+    }
+
+    .arch-badge.mask {
+      background: rgba(16, 185, 129, 0.2);
+      color: #34d399;
+    }
+
+    .arch-header h3 {
+      font-size: 1.25rem;
+      margin: 0;
+    }
+
+    .arch-desc {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      margin-bottom: 1rem;
+    }
+
+    .arch-code {
+      background: #0d0d15;
+      border-radius: 10px;
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+      overflow-x: auto;
+    }
+
+    .arch-code pre {
+      margin: 0;
+    }
+
+    .arch-code code {
+      font-family: 'Courier New', monospace;
+      font-size: 0.85rem;
+      color: #a5b4fc;
+      line-height: 1.6;
+    }
+
+    .arch-code code .comment {
+      color: #6b7280;
+    }
+
+    .arch-points {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .arch-points li {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+      padding: 0.4rem 0;
+      padding-left: 1.25rem;
+      position: relative;
+    }
+
+    .arch-arrow {
+      text-align: center;
+      font-size: 2rem;
+      color: var(--primary);
+      padding: 1rem 0;
+      opacity: 0.7;
+    }
+
+    .arch-benefits {
+      margin-top: 4rem;
+      text-align: center;
+    }
+
+    .arch-benefits h4 {
+      font-size: 1.5rem;
+      margin-bottom: 2rem;
+      background: linear-gradient(135deg, #fff 0%, var(--primary-light) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .benefits-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 1.5rem;
+      max-width: 1000px;
+      margin: 0 auto;
+    }
+
+    .benefit-item {
+      background: var(--bg-card);
+      border-radius: 12px;
+      padding: 1.5rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: transform 0.3s ease;
+    }
+
+    .benefit-item:hover {
+      transform: translateY(-5px);
+      border-color: rgba(233, 69, 96, 0.2);
+    }
+
+    .benefit-icon {
+      font-size: 2rem;
+      margin-bottom: 0.75rem;
+      display: block;
+    }
+
+    .benefit-item h5 {
+      font-size: 1.1rem;
+      margin-bottom: 0.5rem;
+      color: var(--text-primary);
+    }
+
+    .benefit-item p {
+      font-size: 0.85rem;
+      color: var(--text-secondary);
+      line-height: 1.6;
+    }
+
     /* 演示区域 */
     .demo {
       padding: 6rem 2rem;
@@ -708,7 +870,7 @@
       </a>
       <ul class="nav-links">
         <li><a href="#features">功能</a></li>
-        <li><a href="#how-it-works">原理</a></li>
+        <li><a href="#architecture">架构</a></li>
         <li><a href="#demo">演示</a></li>
         <li><a href="#faq">FAQ</a></li>
         <li><a href="#install" class="nav-cta">立即安装</a></li>
@@ -825,6 +987,117 @@
     </div>
   </section>
 
+  <!-- 三层分离架构 -->
+  <section class="architecture" id="architecture">
+    <div class="container">
+      <div class="section-header fade-in">
+        <h2>三层分离架构</h2>
+        <p>低侵入、高性能的技术实现</p>
+      </div>
+      <div class="arch-layers">
+        <div class="arch-layer fade-in">
+          <div class="arch-header">
+            <span class="arch-badge css">CSS</span>
+            <h3>第一层：CSS 兜底</h3>
+          </div>
+          <p class="arch-desc">在 <code>document_start</code> 时机注入基础样式，零延迟拦截白屏闪烁</p>
+          <div class="arch-code">
+            <pre><code>/* 全局颜色反转 */
+html { filter: invert(1) hue-rotate(180deg); }
+
+/* 媒体元素保护 - 双重反转 */
+img, video, canvas, svg { 
+  filter: invert(1) hue-rotate(180deg); 
+}</code></pre>
+          </div>
+          <ul class="arch-points">
+            <li>✓ 纯 CSS 方案，无 JavaScript 计算开销</li>
+            <li>✓ 避免「三重反转陷阱」——只选择最终渲染元素</li>
+            <li>✓ 通过 <code>localStorage</code> 缓存状态，同步读取零延迟</li>
+          </ul>
+        </div>
+        
+        <div class="arch-arrow">↓</div>
+        
+        <div class="arch-layer fade-in">
+          <div class="arch-header">
+            <span class="arch-badge js">JS</span>
+            <h3>第二层：JS 增强</h3>
+          </div>
+          <p class="arch-desc">MutationObserver 动态监听，处理运行时注入的背景图</p>
+          <div class="arch-code">
+            <pre><code>// 监听 style 属性变化
+observer.observe(document, {
+  attributes: true,
+  attributeFilter: ['style']
+});
+
+// 检测到 background-image 立即保护
+if (el.style.backgroundImage?.includes('url')) {
+  el.style.filter = 'invert(1) hue-rotate(180deg)';
+}</code></pre>
+          </div>
+          <ul class="arch-points">
+            <li>✓ 精准定位动态背景图，避免全量遍历 DOM</li>
+            <li>✓ 使用 <code>dataset</code> 标记避免重复处理</li>
+            <li>✓ 断开观察器时自动清理副作用</li>
+          </ul>
+        </div>
+        
+        <div class="arch-arrow">↓</div>
+        
+        <div class="arch-layer fade-in">
+          <div class="arch-header">
+            <span class="arch-badge mask">MASK</span>
+            <h3>第三层：遮罩亮度</h3>
+          </div>
+          <p class="arch-desc">固定定位遮罩层，独立控制亮度不影响颜色反转</p>
+          <div class="arch-code">
+            <pre><code>/* 亮度遮罩层 - 与滤镜分离 */
+#darkmode-mask {
+  position: fixed;
+  width: 100vw; height: 100vh;
+  background: rgba(0,0,0,0.08); /* 92% 亮度 */
+  pointer-events: none;
+  z-index: 2147483647;
+}</code></pre>
+          </div>
+          <ul class="arch-points">
+            <li>✓ 亮度调节与颜色反转完全解耦</li>
+            <li>✓ <code>pointer-events: none</code> 不干扰页面交互</li>
+            <li>✓ 固定定位，不随页面滚动产生延迟</li>
+          </ul>
+        </div>
+      </div>
+      
+      <div class="arch-benefits fade-in">
+        <h4>架构优势</h4>
+        <div class="benefits-grid">
+          <div class="benefit-item">
+            <span class="benefit-icon">⚡</span>
+            <h5>零 FOUC</h5>
+            <p>在 HTML 解析前注入样式，彻底消除白屏闪烁</p>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon">🎯</span>
+            <h5>精准保护</h5>
+            <p>只反转最终渲染元素，避免嵌套容器多重反转</p>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon">🔋</span>
+            <h5>极低功耗</h5>
+            <p>CSS 硬件加速 + 精准 MutationObserver，CPU 占用接近零</p>
+          </div>
+          <div class="benefit-item">
+            <span class="benefit-icon">🛡️</span>
+            <h5>完全可逆</h5>
+            <p>三层均可独立启用/禁用，不留任何副作用</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
   <!-- 演示区域 -->
   <section class="demo" id="demo">
     <div class="container">
@@ -882,7 +1155,12 @@
             </svg>
           </div>
           <div class="faq-answer">
-            <p>不会。我们采用智能保护算法，自动识别 img、video、canvas、svg 等元素，对它们进行双重反转，保持原始色彩。</p>
+            <p>不会。三层分离架构确保图片色彩精准还原：</p>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem; color: var(--text-secondary);">
+              <li><strong>CSS 兜底：</strong>对 img、video 等最终渲染元素应用双重反转（偶数次 = 原色）</li>
+              <li><strong>精准选择器：</strong>避免选择 picture/source 等容器，防止「三重反转陷阱」</li>
+              <li><strong>JS 增强：</strong>MutationObserver 动态监测背景图，实时保护</li>
+            </ul>
           </div>
         </div>
         <div class="faq-item fade-in">
@@ -937,7 +1215,7 @@
   <footer>
     <div class="footer-links">
       <a href="#features">功能</a>
-      <a href="#how-it-works">原理</a>
+      <a href="#architecture">架构</a>
       <a href="#demo">演示</a>
       <a href="#faq">FAQ</a>
       <a href="https://github.com/leapx-ai/darkmode-pro" target="_blank">GitHub</a>
