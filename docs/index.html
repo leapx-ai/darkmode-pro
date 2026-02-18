@@ -1002,18 +1002,35 @@
           </div>
           <p class="arch-desc">在 <code>document_start</code> 时机注入基础样式，零延迟拦截白屏闪烁</p>
           <div class="arch-code">
-            <pre><code>/* 全局颜色反转 */
+            <pre><code>/* 【优化】移除 background: #fff，保留原色阶层次感 */
 html { filter: invert(1) hue-rotate(180deg); }
 
-/* 媒体元素保护 - 双重反转 */
-img, video, canvas, svg { 
-  filter: invert(1) hue-rotate(180deg); 
+/* 【优化】:is() 简化媒体保护，提升性能 */
+:is(img, video, svg) { 
+  filter: invert(1) hue-rotate(180deg);
+  mix-blend-mode: normal !important;
+}
+
+/* 【优化】遮罩处理：更精准，避免误伤小图标 */
+:is([class*="mask"], [class*="overlay"]):not(i, span, a, svg) {
+  filter: invert(1) hue-rotate(180deg);
+  pointer-events: none !important;
+}
+
+/* 【优化】亮度遮罩：inset: 0 替代 top/left/width/height */
+#mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.08);
+  pointer-events: none;
 }</code></pre>
           </div>
           <ul class="arch-points">
-            <li>✓ 纯 CSS 方案，无 JavaScript 计算开销</li>
-            <li>✓ 避免「三重反转陷阱」——只选择最终渲染元素</li>
-            <li>✓ 通过 <code>localStorage</code> 缓存状态，同步读取零延迟</li>
+            <li>✓ <strong>移除强制背景色</strong>：保留原色阶，避免"死黑"</li>
+            <li>✓ <code>:is()</code> 减少选择器冗余，提升解析速度</li>
+            <li>✓ <code>:not(i, span, a, svg)</code> 精准排除图标和链接</li>
+            <li>✓ <code>inset: 0</code> 简化遮罩定位</li>
+            <li>✓ <code>pointer-events: none</code> 遮罩不干扰点击</li>
           </ul>
         </div>
         
@@ -1024,23 +1041,38 @@ img, video, canvas, svg {
             <span class="arch-badge js">JS</span>
             <h3>第二层：JS 增强</h3>
           </div>
-          <p class="arch-desc">MutationObserver 动态监听，处理运行时注入的背景图</p>
+          <p class="arch-desc">MutationObserver 动态监听 + Shadow DOM 穿透 + 性能优化</p>
           <div class="arch-code">
-            <pre><code>// 监听 style 属性变化
-observer.observe(document, {
-  attributes: true,
-  attributeFilter: ['style']
-});
+            <pre><code>// 【优化】异步扫描调度：requestIdleCallback 不抢占渲染
+let scanPending = false;
+function scheduleScan() {
+  if (scanPending) return;
+  scanPending = true;
+  
+  const runner = window.requestIdleCallback || ((cb) => setTimeout(cb, 100));
+  runner(() => {
+    scanShadowDOM(document.body);
+    scanPending = false;
+  });
+}
 
-// 检测到 background-image 立即保护
-if (el.style.backgroundImage?.includes('url')) {
-  el.style.filter = 'invert(1) hue-rotate(180deg)';
-}</code></pre>
+// MutationObserver：仅标记 needsScan，异步处理
+observer = new MutationObserver((mutations) => {
+  let needsScan = false;
+  mutations.forEach((mutation) => {
+    if (mutation.type === 'childList') needsScan = true;
+    else if (mutation.attributeName === 'style') {
+      protectBackgroundImage(mutation.target);
+    }
+  });
+  if (needsScan) scheduleScan();
+});</code></pre>
           </div>
           <ul class="arch-points">
-            <li>✓ 精准定位动态背景图，避免全量遍历 DOM</li>
-            <li>✓ 使用 <code>dataset</code> 标记避免重复处理</li>
-            <li>✓ 断开观察器时自动清理副作用</li>
+            <li>✓ <strong>scheduleScan</strong>：异步调度，B站滚动不掉帧</li>
+            <li>✓ <strong>仅标记 needsScan</strong>：MutationObserver 只做轻量判断</li>
+            <li>✓ <strong>WeakSet 防重入</strong>：避免 Shadow DOM 重复注入</li>
+            <li>✓ <strong>Canvas 白名单</strong>：B站/斗鱼等弹幕站点自动排除</li>
           </ul>
         </div>
         
@@ -1056,16 +1088,16 @@ if (el.style.backgroundImage?.includes('url')) {
             <pre><code>/* 亮度遮罩层 - 与滤镜分离 */
 #darkmode-mask {
   position: fixed;
-  width: 100vw; height: 100vh;
+  inset: 0; /* 简化 top/left/width/height */
   background: rgba(0,0,0,0.08); /* 92% 亮度 */
   pointer-events: none;
   z-index: 2147483647;
 }</code></pre>
           </div>
           <ul class="arch-points">
+            <li>✓ <code>inset: 0</code> 简化定位逻辑</li>
             <li>✓ 亮度调节与颜色反转完全解耦</li>
             <li>✓ <code>pointer-events: none</code> 不干扰页面交互</li>
-            <li>✓ 固定定位，不随页面滚动产生延迟</li>
           </ul>
         </div>
       </div>
@@ -1172,6 +1204,40 @@ if (el.style.backgroundImage?.includes('url')) {
           </div>
           <div class="faq-answer">
             <p>扩展内置了常见网站的智能白名单（如 GitHub、YouTube 等），您也可以手动将网站添加到排除列表。</p>
+          </div>
+        </div>
+        <div class="faq-item fade-in">
+          <div class="faq-question">
+            <h4>为什么某些网站（如 Bing）的图片还是反色的？</h4>
+            <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="faq-answer">
+            <p>这通常是因为网站使用了 <strong>Shadow DOM</strong> 技术（Web Components）。全局 CSS 无法穿透 Shadow Root 的隔离屏障。</p>
+            <p style="margin-top: 0.5rem;">我们的解决方案：</p>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem; color: var(--text-secondary);">
+              <li>JS 递归扫描 <code>shadowRoot</code> 并注入保护样式</li>
+              <li>强制 <code>mix-blend-mode: normal</code> 消除混合模式干扰</li>
+              <li>处理渐变遮罩层（<code>.gradient</code>、<code>.overlay</code>）的二次反转</li>
+            </ul>
+          </div>
+        </div>
+        <div class="faq-item fade-in">
+          <div class="faq-question">
+            <h4>B站弹幕颜色为什么保持原样？</h4>
+            <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="faq-answer">
+            <p>B站、斗鱼、虎牙等直播/视频站点的弹幕通常使用 <strong>Canvas</strong> 渲染。如果反转 Canvas，弹幕颜色会变得诡异（例如绿色弹幕变红色）。</p>
+            <p style="margin-top: 0.5rem;">我们采用「Canvas 白名单」策略：</p>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem; color: var(--text-secondary);">
+              <li>对于 <code>bilibili.com</code>、<code>douyu.com</code> 等站点，自动跳过 Canvas 反转</li>
+              <li>确保弹幕颜色保持原样，不影响观看体验</li>
+              <li>游戏类站点（如 Twitch）同样适用此策略</li>
+            </ul>
           </div>
         </div>
         <div class="faq-item fade-in">
