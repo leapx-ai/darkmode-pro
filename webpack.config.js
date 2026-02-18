@@ -82,6 +82,10 @@ module.exports = {
           to: 'docs',
         },
         {
+          from: 'public',
+          to: 'docs/public',
+        },
+        {
           from: 'README.md',
           to: 'README.md',
         },
