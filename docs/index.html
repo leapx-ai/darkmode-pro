@@ -1,0 +1,1010 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="DarkMode Pro - 一键开启夜间模式，智能保护视力。自动识别网页内容，低侵入、高性能的暗黑模式体验。">
+  <meta name="keywords" content="DarkMode,夜间模式,暗黑模式,Chrome扩展,护眼,视力保护">
+  <meta name="author" content="DarkMode Pro Team">
+  <meta property="og:title" content="DarkMode Pro - 智能夜间模式">
+  <meta property="og:description" content="一键开启夜间模式，智能保护视力">
+  <meta property="og:image" content="../public/preview.png">
+  <title>DarkMode Pro - 智能夜间模式 | 一键保护视力</title>
+  <link rel="icon" href="../public/icon32.png">
+  <style>
+    :root {
+      --primary: #e94560;
+      --primary-light: #ff6b6b;
+      --bg-dark: #0f0f1a;
+      --bg-card: #1a1a2e;
+      --bg-card-hover: #252542;
+      --text-primary: #ffffff;
+      --text-secondary: #a0a0b0;
+      --text-muted: #6b6b7b;
+      --accent-blue: #3b82f6;
+      --accent-green: #10b981;
+      --accent-purple: #8b5cf6;
+      --gradient-1: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      --gradient-2: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+      --gradient-3: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    html {
+      scroll-behavior: smooth;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--bg-dark);
+      color: var(--text-primary);
+      line-height: 1.6;
+      overflow-x: hidden;
+    }
+
+    /* 导航栏 */
+    nav {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      background: rgba(15, 15, 26, 0.9);
+      backdrop-filter: blur(20px);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+      padding: 1rem 2rem;
+    }
+
+    .nav-container {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      text-decoration: none;
+      color: var(--text-primary);
+    }
+
+    .logo img {
+      width: 40px;
+      height: 40px;
+      border-radius: 10px;
+    }
+
+    .logo span {
+      font-size: 1.25rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #fff 0%, var(--primary) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .nav-links {
+      display: flex;
+      gap: 2rem;
+      list-style: none;
+    }
+
+    .nav-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      font-size: 0.95rem;
+      transition: color 0.3s;
+    }
+
+    .nav-links a:hover {
+      color: var(--primary);
+    }
+
+    .nav-cta {
+      background: var(--primary);
+      color: white !important;
+      padding: 0.5rem 1.25rem;
+      border-radius: 8px;
+      font-weight: 500;
+      transition: all 0.3s !important;
+    }
+
+    .nav-cta:hover {
+      background: var(--primary-light);
+      transform: translateY(-2px);
+    }
+
+    /* Hero 区域 */
+    .hero {
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 8rem 2rem 4rem;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .hero-bg {
+      position: absolute;
+      inset: 0;
+      overflow: hidden;
+    }
+
+    .hero-bg::before {
+      content: '';
+      position: absolute;
+      top: 20%;
+      left: 10%;
+      width: 400px;
+      height: 400px;
+      background: var(--primary);
+      border-radius: 50%;
+      filter: blur(150px);
+      opacity: 0.2;
+      animation: float 8s ease-in-out infinite;
+    }
+
+    .hero-bg::after {
+      content: '';
+      position: absolute;
+      bottom: 20%;
+      right: 10%;
+      width: 300px;
+      height: 300px;
+      background: var(--accent-blue);
+      border-radius: 50%;
+      filter: blur(150px);
+      opacity: 0.15;
+      animation: float 10s ease-in-out infinite reverse;
+    }
+
+    @keyframes float {
+      0%, 100% { transform: translateY(0) scale(1); }
+      50% { transform: translateY(-30px) scale(1.1); }
+    }
+
+    .hero-content {
+      max-width: 900px;
+      text-align: center;
+      position: relative;
+      z-index: 1;
+    }
+
+    .hero-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(233, 69, 96, 0.1);
+      border: 1px solid rgba(233, 69, 96, 0.3);
+      padding: 0.5rem 1rem;
+      border-radius: 50px;
+      font-size: 0.875rem;
+      color: var(--primary);
+      margin-bottom: 2rem;
+    }
+
+    .hero-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      background: var(--primary);
+      border-radius: 50%;
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .hero h1 {
+      font-size: clamp(2.5rem, 6vw, 4rem);
+      font-weight: 800;
+      line-height: 1.1;
+      margin-bottom: 1.5rem;
+    }
+
+    .hero h1 .gradient {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 50%, var(--accent-blue) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .hero-description {
+      font-size: 1.25rem;
+      color: var(--text-secondary);
+      max-width: 600px;
+      margin: 0 auto 2.5rem;
+    }
+
+    .hero-cta {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 1rem 2rem;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      text-decoration: none;
+      transition: all 0.3s;
+      cursor: pointer;
+      border: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+      color: white;
+      box-shadow: 0 4px 20px rgba(233, 69, 96, 0.4);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 8px 30px rgba(233, 69, 96, 0.5);
+    }
+
+    .btn-secondary {
+      background: var(--bg-card);
+      color: var(--text-primary);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .btn-secondary:hover {
+      background: var(--bg-card-hover);
+      border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .hero-stats {
+      display: flex;
+      justify-content: center;
+      gap: 4rem;
+      margin-top: 4rem;
+      padding-top: 3rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    .stat-item {
+      text-align: center;
+    }
+
+    .stat-value {
+      font-size: 2.5rem;
+      font-weight: 800;
+      background: linear-gradient(135deg, #fff 0%, var(--primary-light) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .stat-label {
+      color: var(--text-secondary);
+      font-size: 0.875rem;
+    }
+
+    /* 预览图 */
+    .preview-section {
+      margin-top: 4rem;
+      display: flex;
+      justify-content: center;
+      padding: 0 1rem;
+    }
+
+    .preview-image {
+      max-width: 100%;
+      width: 900px;
+      border-radius: 16px;
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.1);
+      transition: transform 0.3s ease, box-shadow 0.3s ease;
+    }
+
+    .preview-image:hover {
+      transform: translateY(-5px);
+      box-shadow: 0 50px 100px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(233, 69, 96, 0.3);
+    }
+
+    /* 功能展示 */
+    .features {
+      padding: 6rem 2rem;
+      background: linear-gradient(180deg, var(--bg-dark) 0%, rgba(26, 26, 46, 0.5) 50%, var(--bg-dark) 100%);
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+
+    .section-header {
+      text-align: center;
+      margin-bottom: 4rem;
+    }
+
+    .section-header h2 {
+      font-size: 2.5rem;
+      font-weight: 700;
+      margin-bottom: 1rem;
+    }
+
+    .section-header p {
+      color: var(--text-secondary);
+      font-size: 1.125rem;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+      gap: 2rem;
+    }
+
+    .feature-card {
+      background: var(--bg-card);
+      border-radius: 20px;
+      padding: 2rem;
+      border: 1px solid rgba(255, 255, 255, 0.05);
+      transition: all 0.3s;
+    }
+
+    .feature-card:hover {
+      transform: translateY(-5px);
+      border-color: rgba(233, 69, 96, 0.3);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .feature-icon {
+      width: 60px;
+      height: 60px;
+      border-radius: 16px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 1.5rem;
+      font-size: 1.75rem;
+    }
+
+    .feature-icon.gradient-1 { background: var(--gradient-1); }
+    .feature-icon.gradient-2 { background: var(--gradient-2); }
+    .feature-icon.gradient-3 { background: var(--gradient-3); }
+    .feature-icon.purple { background: linear-gradient(135deg, #a78bfa 0%, #7c3aed 100%); }
+
+    .feature-card h3 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin-bottom: 0.75rem;
+    }
+
+    .feature-card p {
+      color: var(--text-secondary);
+      font-size: 0.95rem;
+      line-height: 1.7;
+    }
+
+    /* 工作原理 */
+    .how-it-works {
+      padding: 6rem 2rem;
+    }
+
+    .steps {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 2rem;
+    }
+
+    .step {
+      text-align: center;
+      position: relative;
+    }
+
+    .step-number {
+      width: 60px;
+      height: 60px;
+      background: linear-gradient(135deg, var(--primary) 0%, var(--accent-purple) 100%);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 0 auto 1.5rem;
+    }
+
+    .step h3 {
+      font-size: 1.125rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .step p {
+      color: var(--text-secondary);
+      font-size: 0.9rem;
+    }
+
+    /* 演示区域 */
+    .demo {
+      padding: 6rem 2rem;
+      background: var(--bg-card);
+    }
+
+    .demo-container {
+      max-width: 1000px;
+      margin: 0 auto;
+      position: relative;
+    }
+
+    .demo-browser {
+      background: var(--bg-dark);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 40px 80px rgba(0, 0, 0, 0.5);
+    }
+
+    .demo-header {
+      background: rgba(255, 255, 255, 0.05);
+      padding: 1rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .demo-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+    }
+
+    .demo-dot.red { background: #ff5f56; }
+    .demo-dot.yellow { background: #ffbd2e; }
+    .demo-dot.green { background: #27ca40; }
+
+    .demo-address {
+      flex: 1;
+      background: rgba(0, 0, 0, 0.3);
+      padding: 0.5rem 1rem;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      color: var(--text-secondary);
+      margin-left: 1rem;
+    }
+
+    .demo-content {
+      padding: 3rem;
+      transition: all 0.5s;
+    }
+
+    .demo-content.light {
+      background: #fff;
+      color: #333;
+    }
+
+    .demo-content.dark {
+      background: #1a1a2e;
+      color: #fff;
+    }
+
+    .demo-content h4 {
+      font-size: 2rem;
+      margin-bottom: 1rem;
+    }
+
+    .demo-content p {
+      margin-bottom: 1rem;
+      opacity: 0.8;
+    }
+
+    .demo-toggle {
+      position: absolute;
+      bottom: -30px;
+      left: 50%;
+      transform: translateX(-50%);
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      background: var(--bg-card);
+      padding: 1rem 2rem;
+      border-radius: 50px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+    }
+
+    .toggle-switch {
+      position: relative;
+      width: 60px;
+      height: 32px;
+      background: var(--bg-dark);
+      border-radius: 16px;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .toggle-switch.active {
+      background: var(--primary);
+    }
+
+    .toggle-switch::after {
+      content: '';
+      position: absolute;
+      top: 4px;
+      left: 4px;
+      width: 24px;
+      height: 24px;
+      background: white;
+      border-radius: 50%;
+      transition: transform 0.3s;
+    }
+
+    .toggle-switch.active::after {
+      transform: translateX(28px);
+    }
+
+    /* FAQ */
+    .faq {
+      padding: 6rem 2rem;
+    }
+
+    .faq-list {
+      max-width: 800px;
+      margin: 0 auto;
+    }
+
+    .faq-item {
+      background: var(--bg-card);
+      border-radius: 12px;
+      margin-bottom: 1rem;
+      overflow: hidden;
+    }
+
+    .faq-question {
+      padding: 1.5rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      transition: background 0.3s;
+    }
+
+    .faq-question:hover {
+      background: var(--bg-card-hover);
+    }
+
+    .faq-question h4 {
+      font-weight: 500;
+    }
+
+    .faq-icon {
+      width: 24px;
+      height: 24px;
+      transition: transform 0.3s;
+    }
+
+    .faq-item.active .faq-icon {
+      transform: rotate(180deg);
+    }
+
+    .faq-answer {
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.3s;
+    }
+
+    .faq-item.active .faq-answer {
+      max-height: 500px;
+    }
+
+    .faq-answer p {
+      padding: 0 1.5rem 1.5rem;
+      color: var(--text-secondary);
+    }
+
+    /* CTA */
+    .cta {
+      padding: 6rem 2rem;
+      text-align: center;
+      background: linear-gradient(135deg, rgba(233, 69, 96, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
+    }
+
+    .cta h2 {
+      font-size: 2.5rem;
+      margin-bottom: 1rem;
+    }
+
+    .cta p {
+      color: var(--text-secondary);
+      margin-bottom: 2rem;
+    }
+
+    /* 页脚 */
+    footer {
+      background: var(--bg-card);
+      padding: 3rem 2rem;
+      text-align: center;
+      border-top: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .footer-links {
+      display: flex;
+      justify-content: center;
+      gap: 2rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .footer-links a {
+      color: var(--text-secondary);
+      text-decoration: none;
+      transition: color 0.3s;
+    }
+
+    .footer-links a:hover {
+      color: var(--primary);
+    }
+
+    .footer-copyright {
+      color: var(--text-muted);
+      font-size: 0.875rem;
+    }
+
+    /* 响应式 */
+    @media (max-width: 768px) {
+      .nav-links {
+        display: none;
+      }
+
+      .hero-stats {
+        flex-direction: column;
+        gap: 2rem;
+      }
+
+      .features-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .hero-cta {
+        flex-direction: column;
+        align-items: center;
+      }
+
+      .btn {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+      }
+
+      .preview-image {
+        border-radius: 12px;
+      }
+    }
+
+    /* 滚动显示动画 */
+    .fade-in {
+      opacity: 0;
+      transform: translateY(30px);
+      transition: all 0.6s ease;
+    }
+
+    .fade-in.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  </style>
+</head>
+<body>
+  <!-- 导航栏 -->
+  <nav>
+    <div class="nav-container">
+      <a href="#" class="logo">
+        <img src="../public/icon128.png" alt="DarkMode Pro">
+        <span>DarkMode Pro</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="#features">功能</a></li>
+        <li><a href="#how-it-works">原理</a></li>
+        <li><a href="#demo">演示</a></li>
+        <li><a href="#faq">FAQ</a></li>
+        <li><a href="#install" class="nav-cta">立即安装</a></li>
+      </ul>
+    </div>
+  </nav>
+
+  <!-- Hero 区域 -->
+  <section class="hero">
+    <div class="hero-bg"></div>
+    <div class="hero-content">
+      <div class="hero-badge">✨ 全新发布 v1.0.0</div>
+      <h1>
+        一键开启
+        <span class="gradient">智能夜间模式</span>
+      </h1>
+      <p class="hero-description">
+        自动识别网页内容，低侵入、高性能的暗黑模式体验。
+        保护您的视力，让夜间浏览更加舒适。
+      </p>
+      <div class="hero-cta">
+        <a href="https://chrome.google.com/webstore" class="btn btn-primary" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/>
+            <polyline points="22,6 12,13 2,6"/>
+          </svg>
+          安装到 Chrome
+        </a>
+        <a href="https://github.com/yourusername/darkmode-pro" class="btn btn-secondary" target="_blank">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+          </svg>
+          查看源码
+        </a>
+      </div>
+      <div class="hero-stats">
+        <div class="stat-item">
+          <div class="stat-value">0ms</div>
+          <div class="stat-label">页面加载延迟</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">100%</div>
+          <div class="stat-label">网站兼容性</div>
+        </div>
+        <div class="stat-item">
+          <div class="stat-value">0KB</div>
+          <div class="stat-label">额外内存占用</div>
+        </div>
+      </div>
+      
+      <!-- 预览图 -->
+      <div class="preview-section fade-in">
+        <img src="../public/preview.png" alt="DarkMode Pro 预览效果" class="preview-image">
+      </div>
+    </div>
+  </section>
+
+  <!-- 功能展示 -->
+  <section class="features" id="features">
+    <div class="container">
+      <div class="section-header fade-in">
+        <h2>核心功能</h2>
+        <p>专为夜间浏览设计的智能功能，保护视力，提升体验</p>
+      </div>
+      <div class="features-grid">
+        <div class="feature-card fade-in">
+          <div class="feature-icon gradient-1">🌙</div>
+          <h3>智能反转</h3>
+          <p>基于 CSS filter 的智能色彩反转算法，自动保护图片和视频不被误反转，保持原始色彩</p>
+        </div>
+        <div class="feature-card fade-in">
+          <div class="feature-icon gradient-2">⚡</div>
+          <h3>零延迟加载</h3>
+          <p>纯 CSS 实现，无需等待 JavaScript 加载，页面打开瞬间即生效，无闪烁无白屏</p>
+        </div>
+        <div class="feature-card fade-in">
+          <div class="feature-icon gradient-3">🎨</div>
+          <h3>个性定制</h3>
+          <p>亮度、对比度、暖色调、灰度自由调节，为每个网站保存独立设置，打造专属体验</p>
+        </div>
+        <div class="feature-card fade-in">
+          <div class="feature-icon purple">🔄</div>
+          <h3>自动跟随</h3>
+          <p>智能检测系统主题偏好，日出日落自动切换，无需手动操作</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 工作原理 -->
+  <section class="how-it-works" id="how-it-works">
+    <div class="container">
+      <div class="section-header fade-in">
+        <h2>工作原理</h2>
+        <p>简单三步，开启舒适浏览</p>
+      </div>
+      <div class="steps">
+        <div class="step fade-in">
+          <div class="step-number">1</div>
+          <h3>安装扩展</h3>
+          <p>从 Chrome 商店一键安装，无需复杂配置</p>
+        </div>
+        <div class="step fade-in">
+          <div class="step-number">2</div>
+          <h3>点击开启</h3>
+          <p>点击工具栏图标或使用快捷键 Alt+Shift+D</p>
+        </div>
+        <div class="step fade-in">
+          <div class="step-number">3</div>
+          <h3>享受护眼</h3>
+          <p>根据喜好调节参数，自动保存设置</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 演示区域 -->
+  <section class="demo" id="demo">
+    <div class="container">
+      <div class="section-header fade-in">
+        <h2>效果演示</h2>
+        <p>实时预览夜间模式效果</p>
+      </div>
+      <div class="demo-container fade-in">
+        <div class="demo-browser">
+          <div class="demo-header">
+            <span class="demo-dot red"></span>
+            <span class="demo-dot yellow"></span>
+            <span class="demo-dot green"></span>
+            <span class="demo-address">example.com/article</span>
+          </div>
+          <div class="demo-content light" id="demoContent">
+            <h4>示例文章标题</h4>
+            <p>这是一段示例文本，展示夜间模式的效果。点击下方的开关可以看到页面从明亮模式切换到暗黑模式的变化。</p>
+            <p>夜间模式会智能反转页面颜色，同时保护图片和视频的色彩不被影响。</p>
+          </div>
+        </div>
+        <div class="demo-toggle">
+          <span>☀️</span>
+          <div class="toggle-switch" id="demoToggle"></div>
+          <span>🌙</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="faq" id="faq">
+    <div class="container">
+      <div class="section-header fade-in">
+        <h2>常见问题</h2>
+        <p>您可能想知道的问题</p>
+      </div>
+      <div class="faq-list">
+        <div class="faq-item fade-in">
+          <div class="faq-question">
+            <h4>使用这个扩展会影响网页加载速度吗？</h4>
+            <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="faq-answer">
+            <p>不会。DarkMode Pro 采用纯 CSS 方案，样式在页面渲染前就已注入，不会产生额外的加载延迟或闪烁。</p>
+          </div>
+        </div>
+        <div class="faq-item fade-in">
+          <div class="faq-question">
+            <h4>夜间模式会影响图片和视频的颜色吗？</h4>
+            <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="faq-answer">
+            <p>不会。我们采用智能保护算法，自动识别 img、video、canvas、svg 等元素，对它们进行双重反转，保持原始色彩。</p>
+          </div>
+        </div>
+        <div class="faq-item fade-in">
+          <div class="faq-question">
+            <h4>某些网站已经有夜间模式了怎么办？</h4>
+            <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="faq-answer">
+            <p>扩展内置了常见网站的智能白名单（如 GitHub、YouTube 等），您也可以手动将网站添加到排除列表。</p>
+          </div>
+        </div>
+        <div class="faq-item fade-in">
+          <div class="faq-question">
+            <h4>快捷键是什么？可以修改吗？</h4>
+            <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="faq-answer">
+            <p>默认快捷键是 Alt+Shift+D。您可以在 Chrome 扩展管理页面 > 键盘快捷键中自定义。</p>
+          </div>
+        </div>
+        <div class="faq-item fade-in">
+          <div class="faq-question">
+            <h4>这个扩展是免费的吗？</h4>
+            <svg class="faq-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="6 9 12 15 18 9"/>
+            </svg>
+          </div>
+          <div class="faq-answer">
+            <p>是的，DarkMode Pro 完全免费且开源。如果您觉得有用，欢迎在 GitHub 给我们一个 Star ⭐</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="cta" id="install">
+    <div class="container">
+      <h2 class="fade-in">准备好保护您的视力了吗？</h2>
+      <p class="fade-in">立即安装 DarkMode Pro，开启舒适夜间浏览体验</p>
+      <a href="https://chrome.google.com/webstore" class="btn btn-primary fade-in" target="_blank">
+        免费安装到 Chrome
+      </a>
+    </div>
+  </section>
+
+  <!-- 页脚 -->
+  <footer>
+    <div class="footer-links">
+      <a href="#features">功能</a>
+      <a href="#how-it-works">原理</a>
+      <a href="#demo">演示</a>
+      <a href="#faq">FAQ</a>
+      <a href="https://github.com/yourusername/darkmode-pro" target="_blank">GitHub</a>
+    </div>
+    <p class="footer-copyright">
+      © 2024 DarkMode Pro. 开源项目，基于 MIT 协议发布。
+    </p>
+  </footer>
+
+  <script>
+    // 滚动显示动画
+    const observerOptions = {
+      threshold: 0.1,
+      rootMargin: '0px 0px -50px 0px'
+    };
+
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, observerOptions);
+
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+
+    // FAQ 展开/收起
+    document.querySelectorAll('.faq-question').forEach(q => {
+      q.addEventListener('click', () => {
+        const item = q.parentElement;
+        const isActive = item.classList.contains('active');
+        
+        // 关闭其他项
+        document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('active'));
+        
+        // 切换当前项
+        if (!isActive) {
+          item.classList.add('active');
+        }
+      });
+    });
+
+    // 演示切换
+    const demoToggle = document.getElementById('demoToggle');
+    const demoContent = document.getElementById('demoContent');
+    
+    demoToggle.addEventListener('click', () => {
+      demoToggle.classList.toggle('active');
+      if (demoToggle.classList.contains('active')) {
+        demoContent.classList.remove('light');
+        demoContent.classList.add('dark');
+      } else {
+        demoContent.classList.remove('dark');
+        demoContent.classList.add('light');
+      }
+    });
+
+    // 平滑滚动
+    document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+      anchor.addEventListener('click', function(e) {
+        e.preventDefault();
+        const target = document.querySelector(this.getAttribute('href'));
+        if (target) {
+          target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      });
+    });
+  </script>
+</body>
+</html>

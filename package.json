@@ -1,0 +1,32 @@
+{
+  "name": "darkmode-pro",
+  "version": "1.0.0",
+  "description": "智能夜间模式 Chrome 扩展 - 一键保护视力",
+  "main": "index.js",
+  "scripts": {
+    "dev": "webpack --mode=development --watch",
+    "build": "webpack --mode=production",
+    "build:dev": "webpack --mode=development",
+    "clean": "rimraf dist",
+    "zip": "npm run build && node scripts/zip.js"
+  },
+  "keywords": [
+    "chrome-extension",
+    "dark-mode",
+    "night-mode",
+    "eye-protection"
+  ],
+  "author": "DarkMode Pro Team",
+  "license": "MIT",
+  "devDependencies": {
+    "copy-webpack-plugin": "^11.0.0",
+    "clean-webpack-plugin": "^4.0.0",
+    "css-loader": "^6.8.1",
+    "css-minimizer-webpack-plugin": "^5.0.1",
+    "mini-css-extract-plugin": "^2.7.6",
+    "rimraf": "^5.0.5",
+    "terser-webpack-plugin": "^5.3.9",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.4"
+  }
+}
