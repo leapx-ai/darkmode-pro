@@ -2,8 +2,8 @@
 
 [![Chrome Web Store](https://img.shields.io/badge/Chrome-Web%20Store-4285F4?logo=googlechrome&logoColor=white)](https://chrome.google.com/webstore)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Version](https://img.shields.io/badge/Version-1.0.0-e94560.svg)](https://github.com/yourusername/darkmode-pro/releases)
-[![GitHub Stars](https://img.shields.io/github/stars/yourusername/darkmode-pro?style=social)](https://github.com/yourusername/darkmode-pro)
+[![Version](https://img.shields.io/badge/Version-1.0.0-e94560.svg)](https://github.com/leapx-ai/darkmode-pro/releases)
+[![GitHub Stars](https://img.shields.io/github/stars/yourusername/darkmode-pro?style=social)](https://github.com/leapx-ai/darkmode-pro)
 
 > 一键开启夜间模式，智能保护视力。自动识别网页内容，低侵入、高性能的暗黑模式体验。
 
