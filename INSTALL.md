@@ -10,7 +10,7 @@
 ### 步骤 1：克隆仓库
 
 ```bash
-git clone https://github.com/yourusername/darkmode-pro.git
+git clone https://github.com/leapx-ai/darkmode-pro.git
 cd darkmode-pro
 ```
 

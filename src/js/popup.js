@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // GitHub 链接
   elements.githubLink.addEventListener('click', (e) => {
     e.preventDefault();
-    chrome.tabs.create({ url: 'https://github.com/yourusername/darkmode-pro' });
+    chrome.tabs.create({ url: 'https://github.com/leapx-ai/darkmode-pro' });
   });
 
   // 帮助链接
