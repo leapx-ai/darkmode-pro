@@ -13,6 +13,7 @@ module.exports = {
   
   // 入口配置
   entry: {
+    'js/preboot': './src/js/preboot.js',
     'js/content': './src/js/content.js',
     'js/background': './src/js/background.js',
     'js/popup': './src/js/popup.js',

@@ -1000,37 +1000,40 @@
             <span class="arch-badge css">CSS</span>
             <h3>第一层：CSS 兜底</h3>
           </div>
-          <p class="arch-desc">在 <code>document_start</code> 时机注入基础样式，零延迟拦截白屏闪烁</p>
+          <p class="arch-desc">在 <code>document_start</code> 时机注入基础样式，支持「智能避让」已暗黑站点</p>
           <div class="arch-code">
-            <pre><code>/* 【优化】移除 background: #fff，保留原色阶层次感 */
-html { filter: invert(1) hue-rotate(180deg); }
-
-/* 【优化】:is() 简化媒体保护，提升性能 */
-:is(img, video, svg) { 
-  filter: invert(1) hue-rotate(180deg);
-  mix-blend-mode: normal !important;
+            <pre><code>/* 【智能避让】普通站点：应用全局反转 */
+html[data-darkmode-pro="on"] { 
+  filter: invert(1) hue-rotate(180deg); 
 }
 
-/* 【优化】遮罩处理：更精准，避免误伤小图标 */
-:is([class*="mask"], [class*="overlay"]):not(i, span, a, svg) {
-  filter: invert(1) hue-rotate(180deg);
-  pointer-events: none !important;
+/* 【智能避让】暗黑站点：保持原样 */
+html[data-darkmode-pro="already-dark"] {
+  /* 不反转，保持站点原生暗黑样式 */
 }
 
-/* 【优化】亮度遮罩：inset: 0 替代 top/left/width/height */
-#mask {
-  position: fixed;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.08);
-  pointer-events: none;
+/* 【优化】媒体元素：亮度/对比度微调 */
+:is(img, video) { 
+  filter: invert(1) hue-rotate(180deg) 
+          brightness(1.05) contrast(0.95) !important;
+}
+
+/* 【优化】背景图：独立亮度微调 */
+[style*="background-image"] {
+  filter: invert(1) hue-rotate(180deg) brightness(0.98) !important;
+}
+
+/* 【优化】SVG：降低饱和度避免过艳 */
+svg {
+  filter: invert(1) hue-rotate(180deg) saturate(0.85) !important;
 }</code></pre>
           </div>
           <ul class="arch-points">
-            <li>✓ <strong>移除强制背景色</strong>：保留原色阶，避免"死黑"</li>
-            <li>✓ <code>:is()</code> 减少选择器冗余，提升解析速度</li>
-            <li>✓ <code>:not(i, span, a, svg)</code> 精准排除图标和链接</li>
+            <li>✓ <strong>智能避让</strong>：自动检测已暗黑站点，避免过度反转</li>
+            <li>✓ <strong>滤镜微调</strong>：brightness/contrast/saturation 精细调整</li>
+            <li>✓ <strong>选择器拆分</strong>：媒体元素与背景图分别优化</li>
+            <li>✓ <strong>二次确认</strong>：2秒后重新检测异步加载的暗黑主题</li>
             <li>✓ <code>inset: 0</code> 简化遮罩定位</li>
-            <li>✓ <code>pointer-events: none</code> 遮罩不干扰点击</li>
           </ul>
         </div>
         
@@ -1203,7 +1206,13 @@ observer = new MutationObserver((mutations) => {
             </svg>
           </div>
           <div class="faq-answer">
-            <p>扩展内置了常见网站的智能白名单（如 GitHub、YouTube 等），您也可以手动将网站添加到排除列表。</p>
+            <p>扩展采用<strong>「智能避让」</strong>策略，自动检测页面是否已支持暗黑模式：</p>
+            <ul style="margin-top: 0.5rem; padding-left: 1.5rem; color: var(--text-secondary);">
+              <li>检测 <code>color-scheme: dark</code> 标准属性</li>
+              <li>检测 <code>data-theme="dark"</code> 等常见主题标记</li>
+              <li>检测背景色亮度（小于 0.4 认为是深色）</li>
+            </ul>
+            <p style="margin-top: 0.5rem;">如果检测到页面已支持暗黑模式，扩展会自动切换为<strong>「静默模式」</strong>——不反转页面，只提供亮度调节功能，避免过度反转。</p>
           </div>
         </div>
         <div class="faq-item fade-in">

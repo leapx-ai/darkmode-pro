@@ -37,6 +37,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     sepia: 0,
     grayscale: 0
   };
+  let isExcludedSite = false;
 
   let currentTab = null;
 
@@ -44,8 +45,14 @@ document.addEventListener('DOMContentLoaded', async () => {
   const Utils = {
     // 更新 UI 状态
     updateUI() {
+      elements.powerBtn.disabled = isExcludedSite;
+
       // 更新电源按钮
-      if (currentState.enabled) {
+      if (isExcludedSite) {
+        elements.powerBtn.classList.remove('active');
+        elements.statusText.textContent = '已排除';
+        elements.statusText.classList.remove('active');
+      } else if (currentState.enabled) {
         elements.powerBtn.classList.add('active');
         elements.statusText.textContent = '已开启';
         elements.statusText.classList.add('active');
@@ -114,8 +121,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
         // 获取当前状态
         const state = await chrome.runtime.sendMessage({ action: 'getCurrentState' });
-        if (state) {
-          currentState = state;
+        if (state && !state.error) {
+          isExcludedSite = !!state.excluded;
+          currentState = {
+            ...currentState,
+            ...state,
+            enabled: isExcludedSite ? false : !!state.enabled
+          };
           Utils.updateUI();
         }
       }
@@ -136,7 +148,16 @@ document.addEventListener('DOMContentLoaded', async () => {
   elements.powerBtn.addEventListener('click', async () => {
     try {
       const result = await chrome.runtime.sendMessage({ action: 'toggleCurrent' });
-      if (result) {
+      if (result?.excluded) {
+        isExcludedSite = true;
+        currentState.enabled = false;
+        Utils.updateUI();
+        Utils.showTooltip('当前网站在排除列表中');
+        return;
+      }
+
+      if (result && !result.error) {
+        isExcludedSite = false;
         currentState.enabled = result.enabled;
         Utils.updateUI();
       }
@@ -149,11 +170,17 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 应用到所有标签页
   elements.applyAllBtn.addEventListener('click', async () => {
     try {
-      await chrome.runtime.sendMessage({ 
+      const result = await chrome.runtime.sendMessage({
         action: 'applyToAllTabs', 
         enabled: currentState.enabled 
       });
-      Utils.showTooltip('已应用到所有标签页');
+      if (result?.success) {
+        if (result.skippedExcluded > 0) {
+          Utils.showTooltip(`已应用，跳过 ${result.skippedExcluded} 个排除站点`);
+        } else {
+          Utils.showTooltip('已应用到所有标签页');
+        }
+      }
     } catch (error) {
       console.error('应用失败:', error);
     }
@@ -175,30 +202,14 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 排除网站
   elements.excludeBtn.addEventListener('click', async () => {
-    if (!currentTab) return;
-    
     try {
-      const url = new URL(currentTab.url);
-      const hostname = url.hostname;
-      
-      // 关闭当前页面的夜间模式
-      if (currentState.enabled) {
-        await chrome.runtime.sendMessage({ action: 'toggleCurrent' });
+      const result = await chrome.runtime.sendMessage({ action: 'excludeCurrentSite' });
+      if (result?.success) {
+        isExcludedSite = true;
         currentState.enabled = false;
         Utils.updateUI();
+        Utils.showTooltip(`已将 ${result.hostname} 添加到排除列表`);
       }
-      
-      // 添加到排除列表
-      const settings = await chrome.runtime.sendMessage({ action: 'getSettings' });
-      if (settings && !settings.excludeSites.includes(hostname)) {
-        settings.excludeSites.push(hostname);
-        await chrome.runtime.sendMessage({ 
-          action: 'saveSettings', 
-          data: settings 
-        });
-      }
-      
-      Utils.showTooltip(`已将 ${hostname} 添加到排除列表`);
     } catch (error) {
       console.error('排除失败:', error);
     }
@@ -245,8 +256,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 更新滤镜
   async function updateFilters() {
+    if (isExcludedSite) return;
+
     try {
-      await chrome.runtime.sendMessage({ 
+      const result = await chrome.runtime.sendMessage({
         action: 'updateCurrent', 
         data: {
           brightness: currentState.brightness,
@@ -255,6 +268,12 @@ document.addEventListener('DOMContentLoaded', async () => {
           grayscale: currentState.grayscale
         }
       });
+      if (result?.excluded) {
+        isExcludedSite = true;
+        currentState.enabled = false;
+        Utils.updateUI();
+        Utils.showTooltip('当前网站在排除列表中');
+      }
     } catch (error) {
       console.error('更新滤镜失败:', error);
     }
@@ -291,7 +310,7 @@ document.addEventListener('DOMContentLoaded', async () => {
   // 帮助链接
   elements.helpLink.addEventListener('click', (e) => {
     e.preventDefault();
-    chrome.tabs.create({ url: 'https://yourusername.github.io/darkmode-pro' });
+    chrome.tabs.create({ url: 'https://github.com/leapx-ai/darkmode-pro#readme' });
   });
 
   // ==================== 添加 CSS 动画 ====================

@@ -1,9 +1,10 @@
 /**
  * DarkMode Pro - 后台服务
- * 处理快捷键、标签页管理和全局设置
+ * 处理快捷键、标签页管理和全局设置。
  */
 
-// ==================== 配置常量 ====================
+const isChromeExtension = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
+
 const STORAGE_KEY = 'darkmode_pro_global';
 const DEFAULT_SETTINGS = {
   autoFollowSystem: true,
@@ -15,9 +16,97 @@ const DEFAULT_SETTINGS = {
   globalGrayscale: 0
 };
 
-// ==================== 图标管理 ====================
+const BLOCKED_SCHEMES = ['chrome://', 'edge://', 'about:', 'devtools://', 'chrome-extension://', 'view-source:'];
+
+function isPageUrlAllowed(url) {
+  if (!url) return false;
+  return !BLOCKED_SCHEMES.some((scheme) => url.startsWith(scheme));
+}
+
+function getHostname(url) {
+  try {
+    return new URL(url).hostname.toLowerCase();
+  } catch (error) {
+    return '';
+  }
+}
+
+function normalizeSettings(raw) {
+  const merged = { ...DEFAULT_SETTINGS, ...(raw || {}) };
+  const excludeSites = Array.isArray(merged.excludeSites) ? merged.excludeSites : [];
+  merged.excludeSites = Array.from(
+    new Set(
+      excludeSites
+        .map((host) => (typeof host === 'string' ? host.trim().toLowerCase() : ''))
+        .filter(Boolean)
+    )
+  );
+  return merged;
+}
+
+function isExcludedHost(hostname, settings) {
+  if (!hostname) return false;
+  return (settings.excludeSites || []).some((site) => {
+    return hostname === site || hostname.endsWith(`.${site}`);
+  });
+}
+
+function getSettings() {
+  if (!chrome.storage?.sync) {
+    return Promise.resolve(normalizeSettings(DEFAULT_SETTINGS));
+  }
+
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(STORAGE_KEY, (result) => {
+      resolve(normalizeSettings(result?.[STORAGE_KEY]));
+    });
+  });
+}
+
+function saveSettings(next) {
+  if (!chrome.storage?.sync) {
+    return Promise.resolve({ success: false, error: 'Storage not available' });
+  }
+
+  const normalized = normalizeSettings(next);
+  return new Promise((resolve) => {
+    chrome.storage.sync.set({ [STORAGE_KEY]: normalized }, () => {
+      resolve({ success: true, settings: normalized });
+    });
+  });
+}
+
+function sendTabMessage(tabId, message) {
+  return new Promise((resolve) => {
+    chrome.tabs.sendMessage(tabId, message, (response) => {
+      if (chrome.runtime.lastError) {
+        resolve({
+          success: false,
+          error: chrome.runtime.lastError.message
+        });
+        return;
+      }
+
+      resolve({ success: true, response });
+    });
+  });
+}
+
+function setBadge(tabId, enabled) {
+  if (!chrome.action) return;
+  chrome.action.setBadgeText({
+    tabId,
+    text: enabled ? 'ON' : ''
+  }).catch(() => {});
+  if (enabled) {
+    chrome.action.setBadgeBackgroundColor({ tabId, color: '#4CAF50' }).catch(() => {});
+  }
+}
+
 const IconManager = {
   setIcon(tabId, enabled) {
+    if (!isChromeExtension || !chrome.action) return;
+
     const iconSet = enabled ? 'icons/icon' : 'icons/icon-gray';
     const paths = {
       16: `${iconSet}16.png`,
@@ -25,284 +114,379 @@ const IconManager = {
       48: `${iconSet}48.png`,
       128: `${iconSet}128.png`
     };
-    
-    chrome.action.setIcon({
-      tabId: tabId,
-      path: paths
-    }).catch(() => {
-      // 忽略错误（如标签页已关闭）
-    });
+
+    chrome.action.setIcon({ tabId, path: paths }).catch(() => {});
   }
 };
 
-// ==================== 标签页管理 ====================
-const TabManager = {
-  // 切换指定标签页的夜间模式
-  async toggle(tabId) {
-    try {
-      // 检查标签页是否有效
-      const tab = await chrome.tabs.get(tabId).catch(() => null);
-      if (!tab || !tab.url || tab.url.startsWith('chrome://') || tab.url.startsWith('edge://')) {
-        return;
-      }
+function setVisualState(tabId, enabled) {
+  IconManager.setIcon(tabId, enabled);
+  setBadge(tabId, enabled);
+}
 
-      // 实际切换
-      chrome.tabs.sendMessage(tabId, { action: 'toggle' }, (response) => {
-        if (chrome.runtime.lastError) {
-          // 内容脚本未加载（白名单网站或刷新中），静默处理
-          console.log('TabManager.toggle: 内容脚本不可用', chrome.runtime.lastError.message);
-          return;
-        }
-        
-        if (response) {
-          IconManager.setIcon(tabId, response.enabled);
-          // 更新徽章
-          chrome.action.setBadgeText({
-            tabId: tabId,
-            text: response.enabled ? 'ON' : ''
-          });
-          chrome.action.setBadgeBackgroundColor({
-            color: '#4CAF50'
-          });
-        }
-      });
-    } catch (error) {
-      console.log('TabManager.toggle error:', error);
+async function getTab(tabId) {
+  if (!chrome.tabs) return null;
+  return chrome.tabs.get(tabId).catch(() => null);
+}
+
+async function getActiveTab() {
+  if (!chrome.tabs) return null;
+  const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+  return tabs[0] || null;
+}
+
+async function excludeTab(tab, excluded) {
+  if (!tab || !tab.id || !isPageUrlAllowed(tab.url)) {
+    return { success: false, error: 'Unsupported tab' };
+  }
+
+  const hostname = getHostname(tab.url);
+  if (!hostname) {
+    return { success: false, error: 'Invalid hostname' };
+  }
+
+  const settings = await getSettings();
+  const sites = new Set(settings.excludeSites || []);
+
+  if (excluded) {
+    sites.add(hostname);
+  } else {
+    sites.delete(hostname);
+  }
+
+  const saved = await saveSettings({
+    ...settings,
+    excludeSites: Array.from(sites)
+  });
+
+  if (!saved.success) return saved;
+
+  if (excluded) {
+    await sendTabMessage(tab.id, {
+      action: 'setState',
+      data: { enabled: false }
+    });
+    setVisualState(tab.id, false);
+  }
+
+  return {
+    success: true,
+    excluded,
+    hostname
+  };
+}
+
+const TabManager = {
+  async toggle(tabId) {
+    const tab = await getTab(tabId);
+    if (!tab || !isPageUrlAllowed(tab.url)) {
+      return { success: false, error: 'Unsupported tab' };
     }
+
+    const settings = await getSettings();
+    const hostname = getHostname(tab.url);
+    if (isExcludedHost(hostname, settings)) {
+      await sendTabMessage(tabId, {
+        action: 'setState',
+        data: { enabled: false }
+      });
+      setVisualState(tabId, false);
+      return {
+        success: false,
+        excluded: true,
+        hostname,
+        enabled: false
+      };
+    }
+
+    const result = await sendTabMessage(tabId, { action: 'toggle' });
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    const response = result.response || { success: false, error: 'Empty response' };
+    if (typeof response.enabled === 'boolean') {
+      setVisualState(tabId, response.enabled);
+    }
+    return response;
   },
 
-  // 应用到所有标签页
+  async getState(tabId) {
+    const tab = await getTab(tabId);
+    if (!tab || !isPageUrlAllowed(tab.url)) {
+      return { success: false, error: 'Unsupported tab' };
+    }
+
+    const settings = await getSettings();
+    const hostname = getHostname(tab.url);
+    if (isExcludedHost(hostname, settings)) {
+      return {
+        success: true,
+        enabled: false,
+        excluded: true,
+        hostname
+      };
+    }
+
+    const result = await sendTabMessage(tabId, { action: 'getState' });
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+    return result.response || { success: false, error: 'Empty response' };
+  },
+
+  async update(tabId, data) {
+    const tab = await getTab(tabId);
+    if (!tab || !isPageUrlAllowed(tab.url)) {
+      return { success: false, error: 'Unsupported tab' };
+    }
+
+    const settings = await getSettings();
+    const hostname = getHostname(tab.url);
+    if (isExcludedHost(hostname, settings)) {
+      return {
+        success: false,
+        excluded: true,
+        hostname
+      };
+    }
+
+    const result = await sendTabMessage(tabId, {
+      action: 'updateFilters',
+      data
+    });
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+    return result.response || { success: false, error: 'Empty response' };
+  },
+
+  async reset(tabId) {
+    const tab = await getTab(tabId);
+    if (!tab || !isPageUrlAllowed(tab.url)) {
+      return { success: false, error: 'Unsupported tab' };
+    }
+
+    const result = await sendTabMessage(tabId, { action: 'reset' });
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    setVisualState(tabId, false);
+    return result.response || { success: false, error: 'Empty response' };
+  },
+
   async applyToAll(enabled) {
-    const tabs = await chrome.tabs.query({});
+    if (!chrome.tabs) return { success: false, error: 'Tabs not available' };
+
+    const [tabs, settings] = await Promise.all([
+      chrome.tabs.query({}),
+      getSettings()
+    ]);
+
+    let touched = 0;
+    let skippedExcluded = 0;
+
     for (const tab of tabs) {
-      if (tab.url && !tab.url.startsWith('chrome://') && !tab.url.startsWith('edge://')) {
-        chrome.tabs.sendMessage(tab.id, { 
-          action: 'setState', 
-          data: { enabled } 
-        }, (response) => {
-          if (chrome.runtime.lastError) {
-            // 内容脚本未加载，跳过
-            return;
-          }
-          if (response) {
-            IconManager.setIcon(tab.id, enabled);
-          }
-        });
+      if (!tab.id || !isPageUrlAllowed(tab.url)) continue;
+
+      const hostname = getHostname(tab.url);
+      const excluded = enabled && isExcludedHost(hostname, settings);
+      if (excluded) {
+        skippedExcluded += 1;
+        continue;
+      }
+
+      const result = await sendTabMessage(tab.id, {
+        action: 'setState',
+        data: { enabled: !!enabled }
+      });
+      if (result.success) {
+        touched += 1;
+        setVisualState(tab.id, !!enabled);
       }
     }
+
+    return { success: true, touched, skippedExcluded };
   }
 };
 
-// ==================== 事件监听 ====================
-
-// 扩展安装/更新
-chrome.runtime.onInstalled.addListener((details) => {
-  if (details.reason === 'install') {
-    // 首次安装，设置默认配置
-    chrome.storage.sync.set({ [STORAGE_KEY]: DEFAULT_SETTINGS });
-    
-    // 显示欢迎通知
-    chrome.notifications.create({
-      type: 'basic',
-      iconUrl: 'icons/icon128.png',
-      title: 'DarkMode Pro 已安装',
-      message: '按 Alt+Shift+D 快速切换夜间模式，或在工具栏点击图标使用。'
-    });
+async function refreshTabVisuals(tabId, tabUrl) {
+  const tab = tabUrl ? { id: tabId, url: tabUrl } : await getTab(tabId);
+  if (!tab || !tab.id || !isPageUrlAllowed(tab.url)) {
+    setVisualState(tabId, false);
+    return;
   }
-});
 
-// 快捷键命令
-chrome.commands.onCommand.addListener((command) => {
-  if (command === 'toggle-darkmode') {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs[0]) {
-        TabManager.toggle(tabs[0].id);
-      }
-    });
+  const settings = await getSettings();
+  const hostname = getHostname(tab.url);
+  if (isExcludedHost(hostname, settings)) {
+    setVisualState(tabId, false);
+    return;
   }
-});
 
-// 工具栏图标点击
-chrome.action.onClicked.addListener((tab) => {
-  TabManager.toggle(tab.id);
-});
+  const result = await sendTabMessage(tab.id, { action: 'getState' });
+  if (result.success && typeof result.response?.enabled === 'boolean') {
+    setVisualState(tab.id, result.response.enabled);
+  } else {
+    setVisualState(tab.id, false);
+  }
+}
 
-// 标签页更新时恢复状态
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete' && tab.url) {
-    // 恢复图标状态
-    chrome.tabs.sendMessage(tabId, { action: 'getState' }, (response) => {
-      if (chrome.runtime.lastError) {
-        // 内容脚本未加载，静默处理
-        return;
-      }
-      if (response) {
-        IconManager.setIcon(tabId, response.enabled);
-        chrome.action.setBadgeText({
-          tabId: tabId,
-          text: response.enabled ? 'ON' : ''
+if (isChromeExtension && chrome.runtime?.onInstalled) {
+  chrome.runtime.onInstalled.addListener((details) => {
+    if (details.reason === 'install' && chrome.storage?.sync) {
+      chrome.storage.sync.set({ [STORAGE_KEY]: DEFAULT_SETTINGS });
+      try {
+        chrome.notifications?.create({
+          type: 'basic',
+          iconUrl: chrome.runtime.getURL('icons/icon128.png'),
+          title: 'DarkMode Pro 已安装',
+          message: '按 Alt+Shift+D 快速切换夜间模式，或在工具栏点击图标使用。'
         });
+      } catch (error) {
+        console.log('通知创建失败:', error);
       }
+    }
+  });
+}
+
+if (isChromeExtension && chrome.commands?.onCommand) {
+  chrome.commands.onCommand.addListener(async (command) => {
+    if (command !== 'toggle-darkmode') return;
+    const tab = await getActiveTab();
+    if (tab?.id) await TabManager.toggle(tab.id);
+  });
+}
+
+if (isChromeExtension && chrome.action?.onClicked) {
+  chrome.action.onClicked.addListener((tab) => {
+    if (tab?.id) {
+      TabManager.toggle(tab.id);
+    }
+  });
+}
+
+if (isChromeExtension && chrome.tabs?.onUpdated) {
+  chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === 'complete') {
+      refreshTabVisuals(tabId, tab?.url);
+    }
+  });
+}
+
+if (isChromeExtension && chrome.tabs?.onActivated) {
+  chrome.tabs.onActivated.addListener((activeInfo) => {
+    refreshTabVisuals(activeInfo.tabId);
+  });
+}
+
+if (isChromeExtension && chrome.runtime?.onMessage) {
+  chrome.runtime.onMessage.addListener((request, _sender, sendResponse) => {
+    (async () => {
+      switch (request?.action) {
+        case 'toggleCurrent': {
+          const tab = await getActiveTab();
+          if (!tab?.id) return sendResponse({ success: false, error: 'No active tab' });
+          return sendResponse(await TabManager.toggle(tab.id));
+        }
+
+        case 'getCurrentState': {
+          const tab = await getActiveTab();
+          if (!tab?.id) return sendResponse({ success: false, error: 'No active tab' });
+          return sendResponse(await TabManager.getState(tab.id));
+        }
+
+        case 'updateCurrent': {
+          const tab = await getActiveTab();
+          if (!tab?.id) return sendResponse({ success: false, error: 'No active tab' });
+          return sendResponse(await TabManager.update(tab.id, request?.data || {}));
+        }
+
+        case 'resetCurrent': {
+          const tab = await getActiveTab();
+          if (!tab?.id) return sendResponse({ success: false, error: 'No active tab' });
+          return sendResponse(await TabManager.reset(tab.id));
+        }
+
+        case 'applyToAllTabs':
+          return sendResponse(await TabManager.applyToAll(!!request?.enabled));
+
+        case 'excludeCurrentSite': {
+          const tab = await getActiveTab();
+          if (!tab?.id) return sendResponse({ success: false, error: 'No active tab' });
+          return sendResponse(await excludeTab(tab, true));
+        }
+
+        case 'getSettings':
+          return sendResponse(await getSettings());
+
+        case 'saveSettings': {
+          const saved = await saveSettings(request?.data || DEFAULT_SETTINGS);
+          return sendResponse(saved.success ? { success: true } : saved);
+        }
+
+        default:
+          return sendResponse({ success: false, error: `Unknown action: ${request?.action || 'empty'}` });
+      }
+    })().catch((error) => {
+      sendResponse({ success: false, error: error?.message || String(error) });
+    });
+
+    return true;
+  });
+}
+
+if (isChromeExtension && chrome.contextMenus) {
+  const createContextMenus = () => {
+    chrome.contextMenus.create({
+      id: 'toggleDarkMode',
+      title: '切换夜间模式',
+      contexts: ['page']
+    });
+
+    chrome.contextMenus.create({
+      id: 'separator1',
+      type: 'separator',
+      contexts: ['page']
+    });
+
+    chrome.contextMenus.create({
+      id: 'excludeSite',
+      title: '在当前网站禁用',
+      contexts: ['page']
+    });
+
+    chrome.contextMenus.create({
+      id: 'resetSite',
+      title: '重置当前网站设置',
+      contexts: ['page']
+    });
+  };
+
+  if (chrome.runtime?.onInstalled) {
+    chrome.runtime.onInstalled.addListener(() => {
+      chrome.contextMenus.removeAll(() => {
+        createContextMenus();
+      });
     });
   }
-});
 
-// 标签页切换时更新图标
-chrome.tabs.onActivated.addListener((activeInfo) => {
-  chrome.tabs.sendMessage(activeInfo.tabId, { action: 'getState' }, (response) => {
-    if (chrome.runtime.lastError) {
-      // 内容脚本未加载，重置图标
-      IconManager.setIcon(activeInfo.tabId, false);
-      chrome.action.setBadgeText({ tabId: activeInfo.tabId, text: '' });
+  chrome.contextMenus.onClicked.addListener((info, tab) => {
+    if (!tab?.id) return;
+
+    if (info.menuItemId === 'toggleDarkMode') {
+      TabManager.toggle(tab.id);
       return;
     }
-    if (response) {
-      IconManager.setIcon(activeInfo.tabId, response.enabled);
-      chrome.action.setBadgeText({
-        tabId: activeInfo.tabId,
-        text: response.enabled ? 'ON' : ''
-      });
+
+    if (info.menuItemId === 'excludeSite') {
+      excludeTab(tab, true);
+      return;
+    }
+
+    if (info.menuItemId === 'resetSite') {
+      TabManager.reset(tab.id);
     }
   });
-});
-
-// 处理来自 popup 的消息
-chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  switch (request.action) {
-    case 'toggleCurrent':
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'toggle' }, (response) => {
-            if (chrome.runtime.lastError) {
-              sendResponse({ error: chrome.runtime.lastError.message });
-              return;
-            }
-            if (response) {
-              IconManager.setIcon(tabs[0].id, response.enabled);
-              chrome.action.setBadgeText({
-                tabId: tabs[0].id,
-                text: response.enabled ? 'ON' : ''
-              });
-            }
-            sendResponse(response);
-          });
-        }
-      });
-      return true;
-
-    case 'getCurrentState':
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'getState' }, (response) => {
-            if (chrome.runtime.lastError) {
-              sendResponse({ error: chrome.runtime.lastError.message });
-              return;
-            }
-            sendResponse(response);
-          });
-        } else {
-          sendResponse(null);
-        }
-      });
-      return true;
-
-    case 'updateCurrent':
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { 
-            action: 'updateFilters', 
-            data: request.data 
-          }, (response) => {
-            if (chrome.runtime.lastError) {
-              sendResponse({ error: chrome.runtime.lastError.message });
-              return;
-            }
-            sendResponse(response);
-          });
-        }
-      });
-      return true;
-
-    case 'resetCurrent':
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        if (tabs[0]) {
-          chrome.tabs.sendMessage(tabs[0].id, { action: 'reset' }, (response) => {
-            if (chrome.runtime.lastError) {
-              sendResponse({ error: chrome.runtime.lastError.message });
-              return;
-            }
-            IconManager.setIcon(tabs[0].id, false);
-            chrome.action.setBadgeText({ tabId: tabs[0].id, text: '' });
-            sendResponse(response);
-          });
-        }
-      });
-      return true;
-
-    case 'applyToAllTabs':
-      TabManager.applyToAll(request.enabled);
-      sendResponse({ success: true });
-      return true;
-
-    case 'getSettings':
-      chrome.storage.sync.get(STORAGE_KEY, (result) => {
-        sendResponse(result[STORAGE_KEY] || DEFAULT_SETTINGS);
-      });
-      return true;
-
-    case 'saveSettings':
-      chrome.storage.sync.set({ [STORAGE_KEY]: request.data }, () => {
-        sendResponse({ success: true });
-      });
-      return true;
-  }
-});
-
-// 上下文菜单（右键菜单）
-chrome.runtime.onInstalled.addListener(() => {
-  chrome.contextMenus.create({
-    id: 'toggleDarkMode',
-    title: '切换夜间模式',
-    contexts: ['page']
-  });
-  
-  chrome.contextMenus.create({
-    id: 'separator1',
-    type: 'separator',
-    contexts: ['page']
-  });
-  
-  chrome.contextMenus.create({
-    id: 'excludeSite',
-    title: '在当前网站禁用',
-    contexts: ['page']
-  });
-  
-  chrome.contextMenus.create({
-    id: 'resetSite',
-    title: '重置当前网站设置',
-    contexts: ['page']
-  });
-});
-
-chrome.contextMenus.onClicked.addListener((info, tab) => {
-  switch (info.menuItemId) {
-    case 'toggleDarkMode':
-      TabManager.toggle(tab.id);
-      break;
-    case 'excludeSite':
-      const hostname = new URL(tab.url).hostname;
-      chrome.storage.sync.get(STORAGE_KEY, (result) => {
-        const settings = result[STORAGE_KEY] || DEFAULT_SETTINGS;
-        if (!settings.excludeSites.includes(hostname)) {
-          settings.excludeSites.push(hostname);
-          chrome.storage.sync.set({ [STORAGE_KEY]: settings });
-        }
-      });
-      break;
-    case 'resetSite':
-      const siteHostname = new URL(tab.url).hostname;
-      chrome.storage.local.remove(`darkmode_state_${siteHostname}`);
-      break;
-  }
-});
+}
