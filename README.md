@@ -26,7 +26,7 @@
 ## ✨ 特性
 
 - 🌙 **智能反转** - 自动保护图片、视频、Canvas 等元素，保持原始色彩
-- ⚡ **零延迟** - 纯 CSS 方案，页面加载瞬间生效，无闪烁
+- ⚡ **首帧无闪烁** - `document_start` 预注入样式，刷新阶段避免白屏闪烁
 - 🎨 **个性定制** - 亮度、对比度、暖色调自由调节
 - 🔄 **自动跟随** - 根据系统主题偏好自动切换
 - ⌨️ **快捷键支持** - Alt+Shift+D 快速切换
@@ -101,7 +101,9 @@ npm run zip
 darkmode-extension/
 ├── src/                      # 源代码
 │   ├── js/                   # JavaScript 文件
-│   │   ├── content.js        # 内容脚本（核心逻辑）
+│   │   ├── preboot.js        # document_start 首帧兜底
+│   │   ├── darkmode-engine.js # 视觉状态机引擎
+│   │   ├── content.js        # 内容脚本入口（桥接引擎）
 │   │   ├── background.js     # 后台服务
 │   │   └── popup.js          # 弹出面板逻辑
 │   ├── css/                  # 样式文件
@@ -125,24 +127,32 @@ darkmode-extension/
 
 ### 核心原理
 
-DarkMode Pro 采用 **CSS Filter 智能反转** 方案：
+DarkMode Pro 采用 **preboot + CSS Filter + JS 增强** 方案：
 
 ```css
 html[data-darkmode-pro="on"] {
-  filter: invert(1) hue-rotate(180deg) brightness(100%) contrast(100%);
+  background-color: #fff;
+  filter: invert(1) hue-rotate(180deg);
 }
 
-/* 保护图片/视频不被反转 */
-html[data-darkmode-pro="on"] img,
-html[data-darkmode-pro="on"] video {
-  filter: invert(1) hue-rotate(180deg) brightness(100%) contrast(100%);
+/* 保护媒体元素颜色 */
+html[data-darkmode-pro="on"] :is(img, video, canvas, svg) {
+  filter: invert(1) hue-rotate(180deg);
+}
+
+/* 亮度遮罩，与颜色反转解耦 */
+#darkmode-pro-mask {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
 }
 ```
 
 ### 性能优化
 
-- **零 JavaScript 依赖渲染** - 核心样式使用纯 CSS
-- **懒加载** - 动态内容使用 `MutationObserver` 延迟处理
+- **首帧兜底** - `preboot.js` 在 `document_start` 阶段先上 pending 样式
+- **一次性决断** - `resolve()` 在稳定帧后再进入 `on / already-dark`
+- **懒处理** - 动态内容使用 `MutationObserver` + 空闲调度处理
 - **GPU 加速** - 利用 `filter` 硬件加速特性
 - **代码压缩** - Webpack + Terser 自动压缩
 

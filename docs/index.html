@@ -943,8 +943,8 @@
         </div>
         <div class="feature-card fade-in">
           <div class="feature-icon gradient-2">⚡</div>
-          <h3>零延迟加载</h3>
-          <p>纯 CSS 实现，无需等待 JavaScript 加载，页面打开瞬间即生效，无闪烁无白屏</p>
+          <h3>首帧无闪烁</h3>
+          <p><code>document_start</code> 预注入样式，刷新阶段减少白屏/灰屏闪烁，再由状态机完成最终决断</p>
         </div>
         <div class="feature-card fade-in">
           <div class="feature-icon gradient-3">🎨</div>
@@ -1000,39 +1000,36 @@
             <span class="arch-badge css">CSS</span>
             <h3>第一层：CSS 兜底</h3>
           </div>
-          <p class="arch-desc">在 <code>document_start</code> 时机注入基础样式，支持「智能避让」已暗黑站点</p>
+          <p class="arch-desc"><code>document_start</code> 先注入 pending 兜底，再根据页面亮度决断为 <code>on / already-dark</code></p>
           <div class="arch-code">
-            <pre><code>/* 【智能避让】普通站点：应用全局反转 */
-html[data-darkmode-pro="on"] { 
-  filter: invert(1) hue-rotate(180deg); 
+            <pre><code>/* document_start 首帧兜底 */
+html.darkmode-pro-pending {
+  background-color: #fff !important;
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+html.darkmode-pro-pending :is(img, video, canvas, svg) {
+  filter: invert(1) hue-rotate(180deg) !important;
 }
 
-/* 【智能避让】暗黑站点：保持原样 */
+/* resolve 后：普通站点 */
+html[data-darkmode-pro="on"] {
+  background-color: #fff !important;
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+html[data-darkmode-pro="on"] :is(img, video, canvas, svg) {
+  filter: invert(1) hue-rotate(180deg) !important;
+}
+
+/* 已暗黑站点：保持原样，仅可叠加亮度遮罩 */
 html[data-darkmode-pro="already-dark"] {
-  /* 不反转，保持站点原生暗黑样式 */
-}
-
-/* 【优化】媒体元素：亮度/对比度微调 */
-:is(img, video) { 
-  filter: invert(1) hue-rotate(180deg) 
-          brightness(1.05) contrast(0.95) !important;
-}
-
-/* 【优化】背景图：独立亮度微调 */
-[style*="background-image"] {
-  filter: invert(1) hue-rotate(180deg) brightness(0.98) !important;
-}
-
-/* 【优化】SVG：降低饱和度避免过艳 */
-svg {
-  filter: invert(1) hue-rotate(180deg) saturate(0.85) !important;
+  /* keep native dark theme */
 }</code></pre>
           </div>
           <ul class="arch-points">
             <li>✓ <strong>智能避让</strong>：自动检测已暗黑站点，避免过度反转</li>
-            <li>✓ <strong>滤镜微调</strong>：brightness/contrast/saturation 精细调整</li>
-            <li>✓ <strong>选择器拆分</strong>：媒体元素与背景图分别优化</li>
-            <li>✓ <strong>二次确认</strong>：2秒后重新检测异步加载的暗黑主题</li>
+            <li>✓ <strong>首帧兜底</strong>：pending 阶段先稳住视觉，减少刷新闪烁</li>
+            <li>✓ <strong>选择器拆分</strong>：媒体元素与背景图分别保护，避免误伤视频</li>
+            <li>✓ <strong>一次性决断</strong>：稳定帧后进入 on/already-dark，不来回切换</li>
             <li>✓ <code>inset: 0</code> 简化遮罩定位</li>
           </ul>
         </div>
@@ -1089,7 +1086,7 @@ observer = new MutationObserver((mutations) => {
           <p class="arch-desc">固定定位遮罩层，独立控制亮度不影响颜色反转</p>
           <div class="arch-code">
             <pre><code>/* 亮度遮罩层 - 与滤镜分离 */
-#darkmode-mask {
+#darkmode-pro-mask {
   position: fixed;
   inset: 0; /* 简化 top/left/width/height */
   background: rgba(0,0,0,0.08); /* 92% 亮度 */
@@ -1111,7 +1108,7 @@ observer = new MutationObserver((mutations) => {
           <div class="benefit-item">
             <span class="benefit-icon">⚡</span>
             <h5>零 FOUC</h5>
-            <p>在 HTML 解析前注入样式，彻底消除白屏闪烁</p>
+            <p><code>document_start</code> 预注入 + 刷新不主动清样式，减少白屏闪烁</p>
           </div>
           <div class="benefit-item">
             <span class="benefit-icon">🎯</span>
@@ -1179,7 +1176,7 @@ observer = new MutationObserver((mutations) => {
             </svg>
           </div>
           <div class="faq-answer">
-            <p>不会。DarkMode Pro 采用纯 CSS 方案，样式在页面渲染前就已注入，不会产生额外的加载延迟或闪烁。</p>
+            <p>通常不会。扩展在 <code>document_start</code> 先注入 preboot 样式，随后在稳定帧决断最终状态，因此不会引入明显的额外加载延迟。</p>
           </div>
         </div>
         <div class="faq-item fade-in">
@@ -1192,9 +1189,9 @@ observer = new MutationObserver((mutations) => {
           <div class="faq-answer">
             <p>不会。三层分离架构确保图片色彩精准还原：</p>
             <ul style="margin-top: 0.5rem; padding-left: 1.5rem; color: var(--text-secondary);">
-              <li><strong>CSS 兜底：</strong>对 img、video 等最终渲染元素应用双重反转（偶数次 = 原色）</li>
-              <li><strong>精准选择器：</strong>避免选择 picture/source 等容器，防止「三重反转陷阱」</li>
-              <li><strong>JS 增强：</strong>MutationObserver 动态监测背景图，实时保护</li>
+              <li><strong>CSS 兜底：</strong>对 <code>img/video/canvas/svg</code> 应用二次反转，尽量保持原色</li>
+              <li><strong>容器保护：</strong>背景图节点单独标记，避免把视频容器误当成背景层处理</li>
+              <li><strong>JS 增强：</strong>MutationObserver + Shadow DOM 扫描，动态内容也能持续保护</li>
             </ul>
           </div>
         </div>
