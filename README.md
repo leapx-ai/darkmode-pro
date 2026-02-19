@@ -148,6 +148,7 @@ html[data-darkmode-pro="on"] :is(img, video, canvas, svg) {
   pointer-events: none;
 }
 /* 暖色调由 darkmode-pro-tone-mask 叠加，并在视频场景自动避让 */
+/* 检测到可见 video/canvas 时，contrast/grayscale 也会临时中和 */
 ```
 
 ### 性能优化

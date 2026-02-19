@@ -464,9 +464,10 @@ class DarkModeEngine {
     }
 
     const mediaSelector = this._getMediaSelector();
-    const chain = this._getUserFilterChain();
+    const effectiveFilters = this._getEffectiveRenderFilters();
+    const chain = this._getUserFilterChain(effectiveFilters);
     const bodyFilter = `${this.baseFilter}${chain ? ` ${chain}` : ''}`;
-    const maskOpacity = Math.max(0, (100 - this.siteState.brightness) / 100);
+    const maskOpacity = Math.max(0, (100 - effectiveFilters.brightness) / 100);
 
     if (state === VisualState.RESOLVED_ALREADY_DARK) {
       styleEl.textContent = `
@@ -514,7 +515,8 @@ class DarkModeEngine {
   }
 
   _applyMask(state) {
-    const brightness = this.siteState.brightness;
+    const effectiveFilters = this._getEffectiveRenderFilters();
+    const brightness = effectiveFilters.brightness;
     const shouldAllowOverlay = (
       state === VisualState.RESOLVED_ON ||
       state === VisualState.RESOLVED_ALREADY_DARK
@@ -536,7 +538,7 @@ class DarkModeEngine {
     }
 
     const toneExisting = document.getElementById(this.toneMaskId);
-    const sepia = this.siteState.sepia;
+    const sepia = effectiveFilters.sepia;
     const shouldShowToneMask = shouldAllowOverlay &&
       sepia > 0 &&
       !this._hasVisibleMediaSurface();
@@ -564,17 +566,37 @@ class DarkModeEngine {
     return skipCanvas ? 'img, video, svg' : 'img, video, canvas, svg';
   }
 
-  _getUserFilterChain() {
+  _getUserFilterChain(effectiveFilters = this.siteState) {
     const parts = [];
 
-    if (this.siteState.contrast !== 100) {
-      parts.push(`contrast(${this.siteState.contrast}%)`);
+    if (effectiveFilters.contrast !== 100) {
+      parts.push(`contrast(${effectiveFilters.contrast}%)`);
     }
-    if (this.siteState.grayscale !== 0) {
-      parts.push(`grayscale(${this.siteState.grayscale}%)`);
+    if (effectiveFilters.grayscale !== 0) {
+      parts.push(`grayscale(${effectiveFilters.grayscale}%)`);
     }
 
     return parts.join(' ');
+  }
+
+  _getEffectiveRenderFilters() {
+    const hasVisibleMedia = this._hasVisibleMediaSurface();
+    if (!hasVisibleMedia) {
+      return {
+        brightness: this.siteState.brightness,
+        contrast: this.siteState.contrast,
+        sepia: this.siteState.sepia,
+        grayscale: this.siteState.grayscale
+      };
+    }
+
+    // Keep media colors neutral while preserving stored user settings.
+    return {
+      brightness: this.siteState.brightness,
+      contrast: 100,
+      sepia: 0,
+      grayscale: 0
+    };
   }
 
   _getSepiaOverlayOpacity(sepia) {
@@ -736,14 +758,18 @@ class DarkModeEngine {
     if (this.observer) return;
 
     this._initBackgroundProtection();
-    let overlayRefreshPending = false;
-    const scheduleOverlayRefresh = () => {
-      if (overlayRefreshPending) return;
-      overlayRefreshPending = true;
+    let visualRefreshPending = false;
+    const scheduleVisualRefresh = () => {
+      if (visualRefreshPending) return;
+      visualRefreshPending = true;
 
       setTimeout(() => {
-        overlayRefreshPending = false;
-        this._applyMask(this.stateCtrl.getState());
+        visualRefreshPending = false;
+        const state = this.stateCtrl.getState();
+        if (state === VisualState.RESOLVED_ON || state === VisualState.RESOLVED_ALREADY_DARK) {
+          this._injectCSS(state);
+          this._applyMask(state);
+        }
       }, 80);
     };
 
@@ -764,7 +790,7 @@ class DarkModeEngine {
 
     this.observer = new MutationObserver((mutations) => {
       let needsShadowScan = false;
-      let needsOverlayRefresh = false;
+      let needsVisualRefresh = false;
 
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
@@ -782,16 +808,20 @@ class DarkModeEngine {
               node.matches?.('video, canvas') ||
               node.querySelector?.('video, canvas')
             ) {
-              needsOverlayRefresh = true;
+              needsVisualRefresh = true;
             }
           }
           needsShadowScan = true;
+          needsVisualRefresh = true;
         }
 
         if (mutation.type === 'attributes') {
           this._markBackgroundNode(mutation.target);
-          if (mutation.target.matches?.('video, canvas')) {
-            needsOverlayRefresh = true;
+          if (
+            mutation.target.matches?.('video, canvas') ||
+            mutation.target.querySelector?.('video, canvas')
+          ) {
+            needsVisualRefresh = true;
           }
         }
       }
@@ -799,8 +829,8 @@ class DarkModeEngine {
       if (needsShadowScan) {
         scheduleShadowScan();
       }
-      if (needsOverlayRefresh) {
-        scheduleOverlayRefresh();
+      if (needsVisualRefresh) {
+        scheduleVisualRefresh();
       }
     });
 
@@ -812,7 +842,7 @@ class DarkModeEngine {
     });
 
     scheduleShadowScan();
-    scheduleOverlayRefresh();
+    scheduleVisualRefresh();
   }
 
   _stopEnhancement() {
