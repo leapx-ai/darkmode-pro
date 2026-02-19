@@ -46,7 +46,7 @@ DarkModeEngine
 ├── Bootstrap Layer      // document_start 兜底（preboot + pending）
 ├── Resolver             // isAlreadyDark 判定
 ├── Style Layer          // CSS 注入（filter 在 html）
-├── Mask Layer           // 亮度遮罩
+├── Mask Layer           // 亮度遮罩 + 暖色 Overlay
 └── Enhancement Layer    // Observer / Shadow DOM（延迟启动）
 ```
 
@@ -100,7 +100,7 @@ html[data-darkmode-pro="on"] {
   filter: invert(1) hue-rotate(180deg);
 }
 ```
-原因：实现简单、兼容面广，并能与 preboot 的首帧兜底保持同构。
+原因：实现简单、兼容面广，并能与 preboot 的首帧兜底保持同构。`sepia` 暖色调不再放在根滤镜链，而通过独立 overlay 实现，避免视频偏暖。
 
 #### 2. pending 状态兜底
 document_start 使用 `darkmode-pro-pending` + 预反转样式，避免刷新瞬间白屏：

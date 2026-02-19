@@ -141,12 +141,13 @@ html[data-darkmode-pro="on"] :is(img, video, canvas, svg) {
   filter: invert(1) hue-rotate(180deg);
 }
 
-/* 亮度遮罩，与颜色反转解耦 */
+/* 亮度/暖色遮罩，与颜色反转解耦 */
 #darkmode-pro-mask {
   position: fixed;
   inset: 0;
   pointer-events: none;
 }
+/* 暖色调由 darkmode-pro-tone-mask 叠加，并在视频场景自动避让 */
 ```
 
 ### 性能优化

@@ -1020,7 +1020,7 @@ html[data-darkmode-pro="on"] :is(img, video, canvas, svg) {
   filter: invert(1) hue-rotate(180deg) !important;
 }
 
-/* 已暗黑站点：保持原样，仅可叠加亮度遮罩 */
+/* 已暗黑站点：保持原样，仅可叠加亮度/暖色遮罩 */
 html[data-darkmode-pro="already-dark"] {
   /* keep native dark theme */
 }</code></pre>
@@ -1081,9 +1081,9 @@ observer = new MutationObserver((mutations) => {
         <div class="arch-layer fade-in">
           <div class="arch-header">
             <span class="arch-badge mask">MASK</span>
-            <h3>第三层：遮罩亮度</h3>
+            <h3>第三层：亮度/暖色遮罩</h3>
           </div>
-          <p class="arch-desc">固定定位遮罩层，独立控制亮度不影响颜色反转</p>
+          <p class="arch-desc">固定定位遮罩层，独立控制亮度与暖色调，不改变根反转链路</p>
           <div class="arch-code">
             <pre><code>/* 亮度遮罩层 - 与滤镜分离 */
 #darkmode-pro-mask {
@@ -1092,11 +1092,21 @@ observer = new MutationObserver((mutations) => {
   background: rgba(0,0,0,0.08); /* 92% 亮度 */
   pointer-events: none;
   z-index: 2147483647;
+}
+/* 暖色遮罩层（sepia），检测到 video/canvas 时自动避让 */
+#darkmode-pro-tone-mask {
+  position: fixed;
+  inset: 0;
+  background: rgba(255,214,170,0.03);
+  mix-blend-mode: multiply;
+  pointer-events: none;
+  z-index: 2147483646;
 }</code></pre>
           </div>
           <ul class="arch-points">
             <li>✓ <code>inset: 0</code> 简化定位逻辑</li>
-            <li>✓ 亮度调节与颜色反转完全解耦</li>
+            <li>✓ 亮度/暖色调与颜色反转完全解耦</li>
+            <li>✓ 检测到可见视频时自动停用暖色遮罩，避免视频偏暖</li>
             <li>✓ <code>pointer-events: none</code> 不干扰页面交互</li>
           </ul>
         </div>

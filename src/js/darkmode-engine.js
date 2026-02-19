@@ -198,6 +198,7 @@ class DarkModeEngine {
     this.pendingStyleId = `${this.config.id}-pending`;
     this.prebootStyleId = `${this.config.id}-preboot`;
     this.shadowStyleId = `${this.config.id}-shadow`;
+    this.toneMaskId = `${this.config.id}-tone-mask`;
     this.pendingPrevMinHeight = null;
 
     this.observer = null;
@@ -402,6 +403,9 @@ class DarkModeEngine {
 
     const mask = document.getElementById(this.config.maskId);
     if (mask) mask.remove();
+
+    const toneMask = document.getElementById(this.toneMaskId);
+    if (toneMask) toneMask.remove();
   }
 
   _mountPending() {
@@ -511,25 +515,45 @@ class DarkModeEngine {
 
   _applyMask(state) {
     const brightness = this.siteState.brightness;
-    const shouldShowMask = (
+    const shouldAllowOverlay = (
       state === VisualState.RESOLVED_ON ||
       state === VisualState.RESOLVED_ALREADY_DARK
-    ) && brightness < 100;
+    );
+    const shouldShowMask = shouldAllowOverlay && brightness < 100;
 
     const existing = document.getElementById(this.config.maskId);
     if (!shouldShowMask) {
       if (existing) existing.remove();
+    } else {
+      const mask = existing || document.createElement('div');
+      if (!existing) {
+        mask.id = this.config.maskId;
+        document.documentElement.appendChild(mask);
+      }
+
+      const opacity = Math.max(0, (100 - brightness) / 100);
+      mask.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,${opacity});pointer-events:none;z-index:2147483647`;
+    }
+
+    const toneExisting = document.getElementById(this.toneMaskId);
+    const sepia = this.siteState.sepia;
+    const shouldShowToneMask = shouldAllowOverlay &&
+      sepia > 0 &&
+      !this._hasVisibleMediaSurface();
+
+    if (!shouldShowToneMask) {
+      if (toneExisting) toneExisting.remove();
       return;
     }
 
-    const mask = existing || document.createElement('div');
-    if (!existing) {
-      mask.id = this.config.maskId;
-      document.documentElement.appendChild(mask);
+    const toneMask = toneExisting || document.createElement('div');
+    if (!toneExisting) {
+      toneMask.id = this.toneMaskId;
+      document.documentElement.appendChild(toneMask);
     }
 
-    const opacity = Math.max(0, (100 - brightness) / 100);
-    mask.style.cssText = `position:fixed;inset:0;background:rgba(0,0,0,${opacity});pointer-events:none;z-index:2147483647`;
+    const toneOpacity = this._getSepiaOverlayOpacity(sepia);
+    toneMask.style.cssText = `position:fixed;inset:0;background:rgba(255,214,170,${toneOpacity});mix-blend-mode:multiply;pointer-events:none;z-index:2147483646`;
   }
 
   _getMediaSelector() {
@@ -546,14 +570,38 @@ class DarkModeEngine {
     if (this.siteState.contrast !== 100) {
       parts.push(`contrast(${this.siteState.contrast}%)`);
     }
-    if (this.siteState.sepia !== 0) {
-      parts.push(`sepia(${this.siteState.sepia}%)`);
-    }
     if (this.siteState.grayscale !== 0) {
       parts.push(`grayscale(${this.siteState.grayscale}%)`);
     }
 
     return parts.join(' ');
+  }
+
+  _getSepiaOverlayOpacity(sepia) {
+    const clamped = clamp(sepia, 0, 100, 0);
+    return Math.min(0.24, (clamped / 100) * 0.24);
+  }
+
+  _hasVisibleMediaSurface() {
+    const mediaNodes = document.querySelectorAll('video, canvas');
+
+    for (const el of mediaNodes) {
+      try {
+        const style = window.getComputedStyle(el);
+        if (style.display === 'none' || style.visibility === 'hidden') {
+          continue;
+        }
+
+        const rect = el.getBoundingClientRect();
+        if (rect.width > 48 && rect.height > 48) {
+          return true;
+        }
+      } catch (error) {
+        // ignore measurement failures for detached/cross-origin nodes
+      }
+    }
+
+    return false;
   }
 
   async _waitForDomReady() {
@@ -688,6 +736,16 @@ class DarkModeEngine {
     if (this.observer) return;
 
     this._initBackgroundProtection();
+    let overlayRefreshPending = false;
+    const scheduleOverlayRefresh = () => {
+      if (overlayRefreshPending) return;
+      overlayRefreshPending = true;
+
+      setTimeout(() => {
+        overlayRefreshPending = false;
+        this._applyMask(this.stateCtrl.getState());
+      }, 80);
+    };
 
     let scanPending = false;
     const scheduleShadowScan = () => {
@@ -706,6 +764,7 @@ class DarkModeEngine {
 
     this.observer = new MutationObserver((mutations) => {
       let needsShadowScan = false;
+      let needsOverlayRefresh = false;
 
       for (const mutation of mutations) {
         if (mutation.type === 'childList') {
@@ -718,17 +777,30 @@ class DarkModeEngine {
                 this._markBackgroundNode(el);
               });
             }
+
+            if (
+              node.matches?.('video, canvas') ||
+              node.querySelector?.('video, canvas')
+            ) {
+              needsOverlayRefresh = true;
+            }
           }
           needsShadowScan = true;
         }
 
         if (mutation.type === 'attributes') {
           this._markBackgroundNode(mutation.target);
+          if (mutation.target.matches?.('video, canvas')) {
+            needsOverlayRefresh = true;
+          }
         }
       }
 
       if (needsShadowScan) {
         scheduleShadowScan();
+      }
+      if (needsOverlayRefresh) {
+        scheduleOverlayRefresh();
       }
     });
 
@@ -740,6 +812,7 @@ class DarkModeEngine {
     });
 
     scheduleShadowScan();
+    scheduleOverlayRefresh();
   }
 
   _stopEnhancement() {
