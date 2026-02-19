@@ -12,9 +12,9 @@ const VisualState = {
 };
 
 const DEFAULT_FILTERS = {
-  brightness: 100,
-  contrast: 100,
-  sepia: 0,
+  brightness: 92,
+  contrast: 95,
+  sepia: 12,
   grayscale: 0
 };
 

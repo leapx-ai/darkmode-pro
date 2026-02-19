@@ -3,6 +3,13 @@
  */
 
 document.addEventListener('DOMContentLoaded', async () => {
+  const EYE_CARE_DEFAULT_FILTERS = {
+    brightness: 92,
+    contrast: 95,
+    sepia: 12,
+    grayscale: 0
+  };
+
   // ==================== DOM 元素 ====================
   const elements = {
     powerBtn: document.getElementById('powerBtn'),
@@ -32,10 +39,10 @@ document.addEventListener('DOMContentLoaded', async () => {
   // ==================== 状态管理 ====================
   let currentState = {
     enabled: false,
-    brightness: 100,
-    contrast: 100,
-    sepia: 0,
-    grayscale: 0
+    brightness: EYE_CARE_DEFAULT_FILTERS.brightness,
+    contrast: EYE_CARE_DEFAULT_FILTERS.contrast,
+    sepia: EYE_CARE_DEFAULT_FILTERS.sepia,
+    grayscale: EYE_CARE_DEFAULT_FILTERS.grayscale
   };
   let isExcludedSite = false;
 
@@ -217,10 +224,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
   // 重置滤镜
   elements.resetFiltersBtn.addEventListener('click', async () => {
-    currentState.brightness = 100;
-    currentState.contrast = 100;
-    currentState.sepia = 0;
-    currentState.grayscale = 0;
+    currentState.brightness = EYE_CARE_DEFAULT_FILTERS.brightness;
+    currentState.contrast = EYE_CARE_DEFAULT_FILTERS.contrast;
+    currentState.sepia = EYE_CARE_DEFAULT_FILTERS.sepia;
+    currentState.grayscale = EYE_CARE_DEFAULT_FILTERS.grayscale;
     
     await updateFilters();
     Utils.showTooltip('滤镜已重置');

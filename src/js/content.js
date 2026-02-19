@@ -9,6 +9,18 @@ const { DarkModeEngine } = require('./darkmode-engine');
   'use strict';
 
   const STORAGE_KEY = 'darkmode_pro_global';
+  const LEGACY_DEFAULT_FILTERS = {
+    brightness: 100,
+    contrast: 100,
+    sepia: 0,
+    grayscale: 0
+  };
+  const EYE_CARE_DEFAULT_FILTERS = {
+    brightness: 92,
+    contrast: 95,
+    sepia: 12,
+    grayscale: 0
+  };
 
   function getDomainCandidates(hostname) {
     if (!hostname) return [];
@@ -66,6 +78,14 @@ const { DarkModeEngine } = require('./darkmode-engine');
     });
   }
 
+  function usesLegacyGlobalFilters(settings) {
+    if (!settings || typeof settings !== 'object') return false;
+    return Number(settings.globalBrightness) === LEGACY_DEFAULT_FILTERS.brightness &&
+      Number(settings.globalContrast) === LEGACY_DEFAULT_FILTERS.contrast &&
+      Number(settings.globalSepia) === LEGACY_DEFAULT_FILTERS.sepia &&
+      Number(settings.globalGrayscale) === LEGACY_DEFAULT_FILTERS.grayscale;
+  }
+
   if (window.__darkModeProInstalled) return;
   if (window.self !== window.top) return;
   window.__darkModeProInstalled = true;
@@ -90,12 +110,15 @@ const { DarkModeEngine } = require('./darkmode-engine');
     const hasSiteState = hasPersistedSiteState(['darkmode-pro_state_', 'darkmode_pro_cache_']);
     if (hasSiteState) return;
 
-    const nextFilters = {
-      brightness: settings.globalBrightness,
-      contrast: settings.globalContrast,
-      sepia: settings.globalSepia,
-      grayscale: settings.globalGrayscale
-    };
+    const shouldUpgradeLegacy = usesLegacyGlobalFilters(settings);
+    const nextFilters = shouldUpgradeLegacy
+      ? { ...EYE_CARE_DEFAULT_FILTERS }
+      : {
+        brightness: settings.globalBrightness,
+        contrast: settings.globalContrast,
+        sepia: settings.globalSepia,
+        grayscale: settings.globalGrayscale
+      };
     engine.update(nextFilters);
 
     const autoBySystem = (

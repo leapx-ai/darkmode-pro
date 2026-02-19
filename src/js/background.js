@@ -6,14 +6,26 @@
 const isChromeExtension = typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.id;
 
 const STORAGE_KEY = 'darkmode_pro_global';
+const LEGACY_DEFAULT_FILTERS = {
+  brightness: 100,
+  contrast: 100,
+  sepia: 0,
+  grayscale: 0
+};
+const EYE_CARE_DEFAULT_FILTERS = {
+  brightness: 92,
+  contrast: 95,
+  sepia: 12,
+  grayscale: 0
+};
 const DEFAULT_SETTINGS = {
   autoFollowSystem: true,
   defaultEnabled: false,
   excludeSites: [],
-  globalBrightness: 100,
-  globalContrast: 100,
-  globalSepia: 0,
-  globalGrayscale: 0
+  globalBrightness: EYE_CARE_DEFAULT_FILTERS.brightness,
+  globalContrast: EYE_CARE_DEFAULT_FILTERS.contrast,
+  globalSepia: EYE_CARE_DEFAULT_FILTERS.sepia,
+  globalGrayscale: EYE_CARE_DEFAULT_FILTERS.grayscale
 };
 
 const BLOCKED_SCHEMES = ['chrome://', 'edge://', 'about:', 'devtools://', 'chrome-extension://', 'view-source:'];
@@ -60,6 +72,33 @@ function getSettings() {
     chrome.storage.sync.get(STORAGE_KEY, (result) => {
       resolve(normalizeSettings(result?.[STORAGE_KEY]));
     });
+  });
+}
+
+function usesLegacyGlobalFilters(raw) {
+  if (!raw || typeof raw !== 'object') return false;
+  return Number(raw.globalBrightness) === LEGACY_DEFAULT_FILTERS.brightness &&
+    Number(raw.globalContrast) === LEGACY_DEFAULT_FILTERS.contrast &&
+    Number(raw.globalSepia) === LEGACY_DEFAULT_FILTERS.sepia &&
+    Number(raw.globalGrayscale) === LEGACY_DEFAULT_FILTERS.grayscale;
+}
+
+function migrateLegacyGlobalDefaults() {
+  if (!chrome.storage?.sync) return;
+
+  chrome.storage.sync.get(STORAGE_KEY, (result) => {
+    const raw = result?.[STORAGE_KEY];
+    if (!usesLegacyGlobalFilters(raw)) return;
+
+    const migrated = normalizeSettings({
+      ...raw,
+      globalBrightness: EYE_CARE_DEFAULT_FILTERS.brightness,
+      globalContrast: EYE_CARE_DEFAULT_FILTERS.contrast,
+      globalSepia: EYE_CARE_DEFAULT_FILTERS.sepia,
+      globalGrayscale: EYE_CARE_DEFAULT_FILTERS.grayscale
+    });
+
+    chrome.storage.sync.set({ [STORAGE_KEY]: migrated }, () => {});
   });
 }
 
@@ -348,7 +387,15 @@ if (isChromeExtension && chrome.runtime?.onInstalled) {
         console.log('通知创建失败:', error);
       }
     }
+
+    if (details.reason === 'update') {
+      migrateLegacyGlobalDefaults();
+    }
   });
+}
+
+if (isChromeExtension) {
+  migrateLegacyGlobalDefaults();
 }
 
 if (isChromeExtension && chrome.commands?.onCommand) {
